@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pre-Roll Videos</title>
+</head>
+<body>
+    <div id="prerollConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
+         data-require="emby-select,emby-input,emby-checkbox,emby-button">
+
+        <div data-role="content">
+            <div class="content-primary">
+
+                <form id="prerollConfigForm">
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h2 class="sectionTitle">Pre-Roll Videos</h2>
+                    </div>
+
+                    <div id="prerollMsg" style="color: orange; margin-bottom: 1em; display: none;"></div>
+
+                    <p class="fieldDescription" style="margin-bottom:1.5em;">
+                        Pick the library that holds your pre-roll clips (studio logos, bumpers, intros).
+                        They play before movies and/or TV episodes when an item is started from the beginning.
+                    </p>
+
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="selectPrerollLibrary">Pre-roll library</label>
+                        <select is="emby-select" id="selectPrerollLibrary" class="emby-select-withcolor">
+                            <option value="">Loading libraries…</option>
+                        </select>
+                        <div class="fieldDescription">Tip: create this library as type "Home Videos and Photos" or "Movies" pointing at a folder of short clips.</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel" for="inputPrerollCount">Clips per play</label>
+                        <input is="emby-input" type="number" id="inputPrerollCount" min="1" max="5" step="1" value="1" />
+                        <div class="fieldDescription">How many pre-rolls to play before each item (1–5).</div>
+                    </div>
+
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="selectOrder">Order</label>
+                        <select is="emby-select" id="selectOrder" class="emby-select-withcolor">
+                            <option value="Shuffle">Shuffle (avoids repeating the last clip)</option>
+                            <option value="Sequential">Sequential (rotate A→Z)</option>
+                        </select>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel" for="inputMaxDuration">Max clip length (seconds)</label>
+                        <input is="emby-input" type="number" id="inputMaxDuration" min="0" step="1" value="0" />
+                        <div class="fieldDescription">Clips longer than this are skipped. 0 = no limit.</div>
+                    </div>
+
+                    <div class="checkboxContainer">
+                        <label class="emby-checkbox-label">
+                            <input is="emby-checkbox" type="checkbox" id="chkEnableMovies" checked />
+                            <span>Play before movies</span>
+                        </label>
+                    </div>
+
+                    <div class="checkboxContainer">
+                        <label class="emby-checkbox-label">
+                            <input is="emby-checkbox" type="checkbox" id="chkEnableTvShows" checked />
+                            <span>Play before TV episodes</span>
+                        </label>
+                    </div>
+
+                    <h3 class="sectionTitle" style="margin-top:2em;">Skip these libraries</h3>
+                    <div class="fieldDescription" style="margin-bottom:.75em;">Items in checked libraries never get pre-rolls.</div>
+                    <div id="excludeList"></div>
+
+                    <br />
+                    <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                        <span>Save</span>
+                    </button>
+                </form>
+
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        (function () {
+            'use strict';
+
+            var pluginId = 'a4b2c3d4-e5f6-7890-abcd-ef1234567891';
+            var page = document.getElementById('prerollConfigPage');
+            var loaded = false;
+
+            function msg(text) {
+                var el = document.getElementById('prerollMsg');
+                el.style.display = text ? 'block' : 'none';
+                el.textContent = text || '';
+            }
+
+            function norm(id) {
+                return (id || '').toString().replace(/-/g, '').toLowerCase();
+            }
+
+            function fetchLibraries() {
+                var api = window.ApiClient;
+                return fetch(api.getUrl('Library/VirtualFolders'), {
+                    headers: { 'Authorization': 'MediaBrowser Token="' + api.accessToken() + '"' }
+                }).then(function (r) {
+                    if (!r.ok) { throw new Error('HTTP ' + r.status); }
+                    return r.json();
+                });
+            }
+
+            function render(folders, config) {
+                var select = document.getElementById('selectPrerollLibrary');
+                var excludeList = document.getElementById('excludeList');
+                var current = norm(config.PrerollLibraryId);
+                var excluded = (config.ExcludedLibraryIds || []).map(norm);
+
+                select.innerHTML = '<option value="">— None (plugin off) —</option>';
+                excludeList.innerHTML = '';
+
+                folders.forEach(function (f) {
+                    var id = f.ItemId || f.Id || '';
+                    var opt = document.createElement('option');
+                    opt.value = id;
+                    opt.textContent = f.Name;
+                    if (norm(id) === current) { opt.selected = true; }
+                    select.appendChild(opt);
+
+                    var wrap = document.createElement('div');
+                    wrap.className = 'checkboxContainer';
+                    wrap.innerHTML =
+                        '<label class="emby-checkbox-label">' +
+                        '<input is="emby-checkbox" type="checkbox" class="chkExclude" />' +
+                        '<span></span></label>';
+                    var chk = wrap.querySelector('input');
+                    chk.setAttribute('data-id', id);
+                    chk.checked = excluded.indexOf(norm(id)) !== -1;
+                    wrap.querySelector('span').textContent = f.Name;
+                    excludeList.appendChild(wrap);
+                });
+
+                if (!folders.length) { msg('No libraries found — add your pre-roll library first.'); }
+            }
+
+            function loadConfig() {
+                if (!window.ApiClient) { setTimeout(loadConfig, 300); return; }
+                loaded = true;
+                msg('');
+                Dashboard.showLoadingMsg();
+
+                Promise.all([ApiClient.getPluginConfiguration(pluginId), fetchLibraries()])
+                    .then(function (res) {
+                        var config = res[0];
+                        render(res[1] || [], config);
+                        document.getElementById('inputPrerollCount').value = config.PrerollCount || 1;
+                        document.getElementById('inputMaxDuration').value = config.MaxDurationSeconds || 0;
+                        document.getElementById('selectOrder').value =
+                            (config.Order === 'Sequential' || config.Order === 1) ? 'Sequential' : 'Shuffle';
+                        document.getElementById('chkEnableTvShows').checked = config.EnableForTvShows !== false;
+                        document.getElementById('chkEnableMovies').checked = config.EnableForMovies !== false;
+                    })
+                    .catch(function (err) { msg('Could not load settings: ' + err.message); })
+                    .finally(function () { Dashboard.hideLoadingMsg(); });
+            }
+
+            function saveConfig() {
+                Dashboard.showLoadingMsg();
+                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    var libId = document.getElementById('selectPrerollLibrary').value;
+                    config.PrerollLibraryId = libId;
+                    config.PrerollCount = Math.min(5, Math.max(1, parseInt(document.getElementById('inputPrerollCount').value, 10) || 1));
+                    config.MaxDurationSeconds = Math.max(0, parseInt(document.getElementById('inputMaxDuration').value, 10) || 0);
+                    config.Order = document.getElementById('selectOrder').value;
+                    config.EnableForTvShows = document.getElementById('chkEnableTvShows').checked;
+                    config.EnableForMovies = document.getElementById('chkEnableMovies').checked;
+                    config.ExcludedLibraryIds = Array.prototype.slice
+                        .call(document.querySelectorAll('#excludeList .chkExclude'))
+                        .filter(function (c) { return c.checked && norm(c.getAttribute('data-id')) !== norm(libId); })
+                        .map(function (c) { return c.getAttribute('data-id'); });
+
+                    return ApiClient.updatePluginConfiguration(pluginId, config);
+                }).then(function (result) {
+                    Dashboard.processPluginConfigurationUpdateResult(result);
+                }).catch(function (err) {
+                    Dashboard.hideLoadingMsg();
+                    msg('Save failed: ' + err.message);
+                });
+            }
+
+            page.addEventListener('pageshow', loadConfig);
+            setTimeout(function () { if (!loaded) { loadConfig(); } }, 1500);
+
+            document.getElementById('prerollConfigForm').addEventListener('submit', function (e) {
+                e.preventDefault();
+                saveConfig();
+                return false;
+            });
+        })();
+    </script>
+</body>
+</html>
