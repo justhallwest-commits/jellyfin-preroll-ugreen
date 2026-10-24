@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Session;
@@ -61,6 +62,7 @@ public sealed class PrerollSessionWatcher : IHostedService, IDisposable
         public DateTime LastPrerollStartUtc { get; set; } = DateTime.MinValue;
         public DateTime LastPrerollStopUtc { get; set; } = DateTime.MinValue;
         public TimeSpan LastPrerollLength { get; set; } = TimeSpan.Zero;
+        public string LastPrerollName { get; set; } = string.Empty;
         public Guid PendingItemId { get; set; } = Guid.Empty;
         public DateTime PendingSinceUtc { get; set; } = DateTime.MinValue;
     }
@@ -127,53 +129,75 @@ public sealed class PrerollSessionWatcher : IHostedService, IDisposable
 
         var now = UtcNow();
         var state = _state.GetOrAdd(session.Id, _ => new SessionState());
+        var device = DescribeDevice(session);
 
         // 1. A pre-roll clip is starting: remember it, nothing else to do.
         if (_selector.IsPrerollClip(item))
         {
             state.LastPrerollStartUtc = now;
             state.LastPrerollLength = TimeSpan.FromTicks(item.RunTimeTicks ?? 0);
+            state.LastPrerollName = item.Name ?? string.Empty;
+            return;
+        }
+
+        // Only movies and episodes are interesting from here on.
+        if (item is not Episode && item is not Movie)
+        {
             return;
         }
 
         var config = Plugin.Instance?.Configuration;
-        if (config is null || !config.PlayBeforeAutoplay)
+        if (config is null)
         {
             return;
         }
+
+        var itemName = DescribeItem(item);
 
         // 2. This is the item we queued pre-rolls for — it's arriving after them. Let it play.
         if (state.PendingItemId == item.Id && now - state.PendingSinceUtc < PendingTimeout)
         {
             state.PendingItemId = Guid.Empty;
+            PrerollActivityLog.Add("Playback", device, itemName, "✓ Pre-roll played first (" + state.LastPrerollName + ", added by the server fallback)", "ok");
             return;
         }
 
-        // 3. Only fresh starts (not resumes).
-        if ((e.PlaybackPositionTicks ?? 0) > StartWindow.Ticks)
-        {
-            return;
-        }
-
-        // 4. A pre-roll just played on this device (normal Play path) — don't double up.
+        // 3. A pre-roll just played on this device — nothing to do.
         bool prerollJustPlayed =
             now - state.LastPrerollStopUtc < AfterPrerollGrace ||
             now - state.LastPrerollStartUtc < state.LastPrerollLength + AfterPrerollGrace;
         if (prerollJustPlayed)
         {
+            PrerollActivityLog.Add("Playback", device, itemName, "✓ Pre-roll played first (" + state.LastPrerollName + ")", "ok");
             return;
         }
 
-        // 5. The device must accept remote "play" commands.
-        if (!session.SupportsRemoteControl)
+        // 4. Only fresh starts (not resumes).
+        var pos = e.PlaybackPositionTicks ?? 0;
+        if (pos > StartWindow.Ticks)
         {
-            _logger.LogDebug("Pre-Roll Videos: {Device} ({Client}) can't be remote-controlled — skipping", session.DeviceName, session.Client);
+            PrerollActivityLog.Add("Playback", device, itemName, "Resumed at " + TimeSpan.FromTicks(pos).ToString(@"h\:mm\:ss") + " — no pre-roll on resume (by design)");
             return;
         }
 
-        var clips = _selector.Select(item, "autoplay");
+        // 5. Would this item get a pre-roll at all?
+        var clips = _selector.Select(item, "autoplay", true, out var reason);
         if (clips.Count == 0)
         {
+            PrerollActivityLog.Add("Playback", device, itemName, "No pre-roll needed: " + reason);
+            return;
+        }
+
+        if (!config.PlayBeforeAutoplay)
+        {
+            PrerollActivityLog.Add("Playback", device, itemName, "✗ Started without a pre-roll (server fallback is turned off)", "warn");
+            return;
+        }
+
+        // 6. The device must accept remote "play" commands.
+        if (!session.SupportsRemoteControl)
+        {
+            PrerollActivityLog.Add("Playback", device, itemName, "✗ Started without a pre-roll — this app doesn't accept remote play commands, so the server can't add one", "warn");
             return;
         }
 
@@ -197,13 +221,39 @@ public sealed class PrerollSessionWatcher : IHostedService, IDisposable
         };
 
         _logger.LogInformation(
-            "Pre-Roll Videos: inserting {Count} pre-roll(s) before \"{Item}\" on {Device} ({Client})",
-            clips.Count, item.Name, session.DeviceName, session.Client);
+            "Pre-Roll Videos: inserting {Count} pre-roll(s) before \"{Item}\" on {Device}",
+            clips.Count, item.Name, device);
+        PrerollActivityLog.Add(
+            "Server fallback",
+            device,
+            itemName,
+            "Started without a pre-roll → told the app to play " + string.Join(", ", clips.Select(c => c.Name)) + " first [" + reason + "]");
 
-        _ = SendAsync(session.Id, request, item.Name);
+        _ = SendAsync(session.Id, request, itemName, device);
     }
 
-    private async Task SendAsync(string sessionId, PlayRequest request, string itemName)
+    private static string DescribeDevice(SessionInfo session)
+    {
+        var d = session.DeviceName ?? string.Empty;
+        var c = session.Client ?? string.Empty;
+        return string.IsNullOrEmpty(c) ? d : d + " (" + c + ")";
+    }
+
+    internal static string DescribeItem(BaseItem item)
+    {
+        if (item is Episode ep)
+        {
+            var code = (ep.ParentIndexNumber.HasValue && ep.IndexNumber.HasValue)
+                ? $"S{ep.ParentIndexNumber.Value:00}E{ep.IndexNumber.Value:00} "
+                : string.Empty;
+            var series = ep.SeriesName;
+            return string.IsNullOrEmpty(series) ? code + ep.Name : series + " " + code + "· " + ep.Name;
+        }
+
+        return item.Name ?? string.Empty;
+    }
+
+    private async Task SendAsync(string sessionId, PlayRequest request, string itemName, string device)
     {
         try
         {
@@ -217,6 +267,7 @@ public sealed class PrerollSessionWatcher : IHostedService, IDisposable
             }
 
             _logger.LogWarning(ex, "Pre-Roll Videos: could not send pre-roll queue for \"{Item}\"", itemName);
+            PrerollActivityLog.Add("Server fallback", device, itemName, "✗ The app rejected the play command: " + ex.Message, "warn");
         }
     }
 

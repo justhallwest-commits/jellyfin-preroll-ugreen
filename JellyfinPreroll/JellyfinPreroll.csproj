@@ -9,9 +9,9 @@
     <RootNamespace>JellyfinPreroll</RootNamespace>
     <AssemblyName>JellyfinPreroll</AssemblyName>
     <!-- Overridden by the GitHub Actions workflow -->
-    <Version>2.2.0</Version>
-    <AssemblyVersion>2.2.0.0</AssemblyVersion>
-    <FileVersion>2.2.0.0</FileVersion>
+    <Version>2.3.0</Version>
+    <AssemblyVersion>2.3.0.0</AssemblyVersion>
+    <FileVersion>2.3.0.0</FileVersion>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -22,14 +22,12 @@
   <PropertyGroup Condition="'$(JellyfinAbi)' == '10.10'">
     <TargetFramework>net8.0</TargetFramework>
     <JellyfinPackageVersion>10.10.7</JellyfinPackageVersion>
-    <HostingPackageVersion>8.0.1</HostingPackageVersion>
     <DefineConstants>$(DefineConstants);JF1010</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(JellyfinAbi)' != '10.10'">
     <TargetFramework>net9.0</TargetFramework>
     <JellyfinPackageVersion>10.11.6</JellyfinPackageVersion>
-    <HostingPackageVersion>9.0.0</HostingPackageVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -43,10 +41,6 @@
     <PackageReference Include="Jellyfin.Data" Version="$(JellyfinPackageVersion)">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <!-- IHostedService for the autoplay watcher (already part of Jellyfin's runtime) -->
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="$(HostingPackageVersion)">
-      <ExcludeAssets>runtime</ExcludeAssets>
-    </PackageReference>
   </ItemGroup>
 
   <ItemGroup Condition="'$(JellyfinAbi)' != '10.10'">
@@ -56,7 +50,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- ASP.NET Core (API controller, web-page injection, hosted service); part of Jellyfin's runtime -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Configuration/configPage.html" />
+    <EmbeddedResource Include="Web/prerollClient.js" />
   </ItemGroup>
 
 </Project>

@@ -22,6 +22,13 @@ public class PrerollSelector
     private static readonly Dictionary<string, HashSet<Guid>> _lastPlayed = new();
     private static readonly Dictionary<string, int> _sequentialIndex = new();
 
+    // Short cache of the pre-roll library contents (a queue plan asks for many items at once).
+    private static readonly TimeSpan PoolCacheTime = TimeSpan.FromSeconds(15);
+    private static readonly object _poolLock = new();
+    private static string _poolKey = string.Empty;
+    private static DateTime _poolTimeUtc = DateTime.MinValue;
+    private static List<BaseItem> _poolCache = new();
+
     private readonly ILibraryManager _libraryManager;
     private readonly ILogger _logger;
 
@@ -43,24 +50,49 @@ public class PrerollSelector
         return GetLibraryIds(item).Contains(libId);
     }
 
+    /// <summary>IDs of every clip in the pre-roll library (any length).</summary>
+    public HashSet<Guid> GetPrerollClipIds()
+    {
+        var config = Plugin.Instance?.Configuration;
+        if (config is null || !Guid.TryParse(config.PrerollLibraryId, out var libId) || libId == Guid.Empty)
+        {
+            return new HashSet<Guid>();
+        }
+
+        try
+        {
+            return GetPrerollVideos(libId, 0).Select(v => v.Id).ToHashSet();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Pre-Roll Videos: could not list pre-roll clips");
+            return new HashSet<Guid>();
+        }
+    }
+
     /// <summary>Pick the clips to play before <paramref name="item"/> (empty list = none).</summary>
-    public List<BaseItem> Select(BaseItem? item, string trigger)
+    public List<BaseItem> Select(BaseItem? item, string trigger) => Select(item, trigger, false, out _);
+
+    /// <summary>Pick clips; <paramref name="reason"/> explains the decision (shown in the activity log).</summary>
+    public List<BaseItem> Select(BaseItem? item, string trigger, bool quiet, out string reason)
     {
         try
         {
-            return SelectInternal(item, trigger);
+            return SelectInternal(item, trigger, quiet, out reason);
         }
         catch (Exception ex)
         {
             // Never break playback because of a pre-roll problem.
             _logger.LogError(ex, "Pre-Roll Videos: failed to pick pre-rolls for {Item}", item?.Name);
+            reason = "error: " + ex.Message;
             return new List<BaseItem>();
         }
     }
 
-    private List<BaseItem> SelectInternal(BaseItem? item, string trigger)
+    private List<BaseItem> SelectInternal(BaseItem? item, string trigger, bool quiet, out string reason)
     {
         var none = new List<BaseItem>();
+        reason = "plugin not ready";
         var config = Plugin.Instance?.Configuration;
         if (config is null || item is null)
         {
@@ -70,11 +102,13 @@ public class PrerollSelector
         if (!Guid.TryParse(config.PrerollLibraryId, out var prerollLibraryId) || prerollLibraryId == Guid.Empty)
         {
             _logger.LogDebug("Pre-Roll Videos: no pre-roll library selected — skipping");
+            reason = "no pre-roll library selected";
             return none;
         }
 
         if (!IsEligibleType(item, config))
         {
+            reason = item is Episode ? "turned off for TV episodes" : item is Movie ? "turned off for movies" : "not a movie or episode";
             return none;
         }
 
@@ -83,6 +117,7 @@ public class PrerollSelector
         // Loop prevention: never put pre-rolls in front of the pre-roll clips themselves.
         if (itemLibraryIds.Contains(prerollLibraryId))
         {
+            reason = "item is a pre-roll clip";
             return none;
         }
 
@@ -90,6 +125,7 @@ public class PrerollSelector
         if (excludedLibs.Count > 0 && itemLibraryIds.Overlaps(excludedLibs))
         {
             _logger.LogDebug("Pre-Roll Videos: \"{Item}\" is in an excluded library — skipping", item.Name);
+            reason = "library is in the skip list";
             return none;
         }
 
@@ -101,6 +137,7 @@ public class PrerollSelector
         if (hit is not null)
         {
             _logger.LogInformation("Pre-Roll Videos: \"{Item}\" has skip tag \"{Tag}\" — no pre-roll", item.Name, hit);
+            reason = "has skip tag \"" + hit + "\"";
             return none;
         }
 
@@ -108,21 +145,24 @@ public class PrerollSelector
         if (pool.Count == 0)
         {
             _logger.LogWarning("Pre-Roll Videos: pre-roll library {Id} has no usable videos", prerollLibraryId);
+            reason = "pre-roll library has no usable videos";
             return none;
         }
 
         int count = Math.Clamp(config.PrerollCount, 1, 5);
         var selected = config.EnableTagMatching
-            ? SelectWithTags(pool, mediaTags, count, config, out var reason)
+            ? SelectWithTags(pool, mediaTags, count, config, out reason)
             : Pick(pool, count, "all", config.Order, out reason);
 
+        var level = quiet ? LogLevel.Debug : LogLevel.Information;
         if (selected.Count == 0)
         {
-            _logger.LogInformation("Pre-Roll Videos ({Trigger}): nothing to play before \"{Item}\" ({Reason})", trigger, item.Name, reason);
+            _logger.Log(level, "Pre-Roll Videos ({Trigger}): nothing to play before \"{Item}\" ({Reason})", trigger, item.Name, reason);
             return none;
         }
 
-        _logger.LogInformation(
+        _logger.Log(
+            level,
             "Pre-Roll Videos ({Trigger}): {Count} pre-roll(s) before \"{Item}\" [{Reason}]: {Clips}",
             trigger,
             selected.Count,
@@ -266,6 +306,28 @@ public class PrerollSelector
     }
 
     private List<BaseItem> GetPrerollVideos(Guid libraryId, int maxDurationSeconds)
+    {
+        var key = libraryId.ToString("N") + ":" + maxDurationSeconds;
+        lock (_poolLock)
+        {
+            if (_poolKey == key && DateTime.UtcNow - _poolTimeUtc < PoolCacheTime)
+            {
+                return _poolCache.ToList();
+            }
+        }
+
+        var fresh = LoadPrerollVideos(libraryId, maxDurationSeconds);
+        lock (_poolLock)
+        {
+            _poolKey = key;
+            _poolTimeUtc = DateTime.UtcNow;
+            _poolCache = fresh;
+        }
+
+        return fresh.ToList();
+    }
+
+    private List<BaseItem> LoadPrerollVideos(Guid libraryId, int maxDurationSeconds)
     {
         var query = new InternalItemsQuery
         {

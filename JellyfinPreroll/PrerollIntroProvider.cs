@@ -33,9 +33,18 @@ public class PrerollIntroProvider : IIntroProvider
     /// <inheritdoc />
     public Task<IEnumerable<IntroInfo>> GetIntros(BaseItem item, User user)
     {
-        IEnumerable<IntroInfo> intros = _selector.Select(item, "play")
-            .Select(v => new IntroInfo { ItemId = v.Id })
-            .ToList();
+        var clips = _selector.Select(item, "play", false, out var reason);
+        if (item is MediaBrowser.Controller.Entities.TV.Episode || item is MediaBrowser.Controller.Entities.Movies.Movie)
+        {
+            PrerollActivityLog.Add(
+                "App asked for intros",
+                string.Empty,
+                PrerollSessionWatcher.DescribeItem(item),
+                clips.Count > 0 ? "Served " + string.Join(", ", clips.Select(c => c.Name)) + " [" + reason + "]" : "No pre-roll: " + reason,
+                clips.Count > 0 ? "ok" : "info");
+        }
+
+        IEnumerable<IntroInfo> intros = clips.Select(v => new IntroInfo { ItemId = v.Id }).ToList();
         return Task.FromResult(intros);
     }
 }

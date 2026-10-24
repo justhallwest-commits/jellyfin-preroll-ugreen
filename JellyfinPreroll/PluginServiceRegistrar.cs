@@ -1,6 +1,7 @@
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Plugins;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JellyfinPreroll;
@@ -14,7 +15,10 @@ public class PluginServiceRegistrar : IPluginServiceRegistrator
         // Pre-rolls when Play is pressed.
         serviceCollection.AddSingleton<IIntroProvider, PrerollIntroProvider>();
 
-        // Pre-rolls for autoplayed next episodes / apps that don't request intros.
+        // Web player integration: adds the queue-building script to the web app.
+        serviceCollection.AddSingleton<IStartupFilter, WebPlayerInjection>();
+
+        // Server fallback for apps without the script (native TV apps, etc.).
         serviceCollection.AddHostedService<PrerollSessionWatcher>();
     }
 }

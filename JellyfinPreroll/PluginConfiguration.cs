@@ -65,6 +65,13 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public bool PlayBeforeAutoplay { get; set; } = true;
 
+    /// <summary>
+    /// Add the Pre-Roll Videos script to the Jellyfin web app so web-based players
+    /// (browser, Jellyfin Media Player, Android phone app, WebView TV apps) queue a
+    /// pre-roll before every movie and episode, with no flash.
+    /// </summary>
+    public bool EnableWebPlayerIntegration { get; set; } = true;
+
     /// <summary>Library IDs whose movies/episodes never get pre-rolls.</summary>
     public string[] ExcludedLibraryIds { get; set; } = System.Array.Empty<string>();
 

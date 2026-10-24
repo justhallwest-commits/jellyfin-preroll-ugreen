@@ -6,11 +6,19 @@ It's a normal server-side Jellyfin plugin with builds for **Jellyfin 10.10** and
 ## Features
 - Pick a pre-roll library, 1–5 clips per play, shuffle (no back-to-back repeats) or sequential order, max clip length
 - Separate on/off switches for movies and TV episodes
-- **Pre-roll before every episode, including autoplay.** Jellyfin apps only ask for pre-rolls when you press Play.
-  When the next episode starts by itself (autoplay, Up Next, Next button), or on apps that never ask, the plugin tells the
-  device to play *pre-roll → that episode → the rest of the series*. It won't double up when the app already played a pre-roll,
-  and it skips resumed playback. You may see a split second of the episode before the pre-roll takes over. Toggle:
-  "Also play before every autoplayed episode".
+- **A pre-roll before every movie and every episode, including autoplay.**
+  - *Why this is needed:* Jellyfin's player only asks for pre-rolls when playback starts at the first item of its queue.
+    Pressing Play on an episode queues the whole series and starts partway in, so on its own Jellyfin only plays a
+    pre-roll before S01E01, and never before autoplayed episodes.
+  - **Web player integration** (default on): the plugin adds a small script to the Jellyfin web app (in memory, nothing
+    written to disk). When you press Play it builds the queue as *pre-roll → episode → pre-roll → next episode…* for
+    browsers, Jellyfin Media Player, the Android phone app and WebView TV apps. There's no flash, and the audio and
+    subtitle tracks you picked still apply to the episode.
+  - **Server fallback** (default on): for apps that don't use the web player, when a movie or episode starts without a
+    pre-roll, the server tells the app to play the pre-roll first. This only works on apps that accept remote control,
+    and you may see a split second of the episode first.
+  - Resumed items keep resuming (no pre-roll in front of a resume), but the episodes after them still get one.
+- **Recent activity** on the settings page shows, for every play, what was queued, played or skipped and why.
 - **Tag matching**
   - Same tag names match automatically: a clip tagged `Horror` plays before media tagged `Horror` (case doesn't matter)
   - Shows pass their tags down to every season and episode
@@ -38,13 +46,14 @@ It's a normal server-side Jellyfin plugin with builds for **Jellyfin 10.10** and
    The page lists the tags it found on your clips so you can check the spelling.
 
 ## Test
-Start an item **from the beginning** in a web browser. Then go to Dashboard → **Logs**, open the newest log, and search `Pre-Roll Videos`. Each play is logged with the clips chosen and why, for example
-`playing 1 pre-roll(s) before "Halloween" [matched tags: Horror]: Spooky`.
-- Resuming never plays pre-rolls.
-- Each client app decides whether to request intros. Web and most official apps do, but test each device you use.
+1. After installing or updating, **restart Jellyfin**, then **reload** every open Jellyfin tab or app so it loads the new script.
+2. Play any episode (not S01E01) from the beginning. Expect pre-roll → episode. Skip to near the end and the next episode
+   should get its own pre-roll.
+3. Dashboard → Plugins → Pre-Roll Videos → **Recent activity** → **Refresh**. You should see
+   "Web player integration active", "Queued … before it" and "✓ Pre-roll played first".
 
 ## Releasing an update (GitHub website only)
-**Actions → Build & Release Plugin → Run workflow** → type a version like `2.2.0`.
+**Actions → Build & Release Plugin → Run workflow** → type a version like `2.4.0`.
 One release is created with two zips (10.11 and 10.10), and `manifest.json` is updated automatically.
 The 10.10 build gets version `1.<major×10+minor>.<patch>.0` (e.g. 2.2.0 → 1.22.0.0) so a 10.11 server never picks it.
 
@@ -56,8 +65,10 @@ The 10.10 build gets version `1.<major×10+minor>.<patch>.0` (e.g. 2.2.0 → 1.2
 | Checksum error on install | The zip attached to the release doesn't match `manifest.json`. Re-upload the exact file. |
 | Library list empty | Refresh the page once the library scan finishes. Any error is shown in orange at the top. |
 | Tagged clip never plays | Check the spelling against the "Tags on your pre-roll clips" list, and that the movie or show really has that tag. |
-| Only the first episode gets a pre-roll | Update to 2.2.0 or later and keep "Also play before every autoplayed episode" on. |
-| A device never gets autoplay pre-rolls | It doesn't accept remote control. The log says "can't be remote-controlled". |
+| Only the first episode gets a pre-roll | Update to 2.3.0 or later, restart Jellyfin, reload the app/tab. Recent activity should show "Web player integration active". |
+| No "Web player integration active" line | The app isn't loading the script: reload it (Ctrl+F5 in a browser), check "Web player integration" is on. Native apps (Android TV/Fire TV, Roku, Swiftfin) don't use the web player; they rely on the server fallback. |
+| "✗ this app doesn't accept remote play commands" | That native app can't be told to play the pre-roll. Use a web-based app on that device if one exists. |
+| "pre-roll clips could not be loaded for this user" | Give that user access to the pre-roll library (Dashboard → Users → Access). |
 
 ## Files
 ```
@@ -67,8 +78,12 @@ JellyfinPreroll/                      plugin source (net8.0 for 10.10, net9.0 fo
   PluginConfiguration.cs              settings incl. tag rules
   PluginServiceRegistrar.cs
   PrerollSelector.cs                  clip selection, tag matching, exclusions, loop protection
-  PrerollIntroProvider.cs             pre-rolls when Play is pressed
-  PrerollSessionWatcher.cs            pre-rolls for autoplayed episodes / apps that skip intros
+  PrerollIntroProvider.cs             pre-rolls when an app asks for intros
+  PrerollSessionWatcher.cs            server fallback + per-play activity
+  PrerollController.cs                API: web script, queue plan, activity
+  PrerollActivityLog.cs               "Recent activity" buffer
+  WebPlayerInjection.cs               adds the script to the web app's index.html (in memory)
+  Web/prerollClient.js                web player integration (queue building)
   Configuration/configPage.html       Dashboard settings page (script must stay inside the page div)
 manifest.json                         Jellyfin plugin repository feed
 ```

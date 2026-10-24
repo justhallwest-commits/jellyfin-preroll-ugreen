@@ -20,6 +20,11 @@
                 border-radius:1em; background:rgba(0,164,220,.18); font-size:.9em; }
             #prerollConfigPage .prBox { padding:1em 1.2em; border-radius:.3em; background:rgba(128,128,128,.08); margin-bottom:1.5em; }
             #prerollConfigPage .prSmallBtn { padding:.45em .9em; min-width:0; margin:0; }
+            #prerollConfigPage .prAct { padding:.55em 0; border-bottom:1px solid rgba(128,128,128,.18); font-size:.92em; line-height:1.4; }
+            #prerollConfigPage .prAct:last-child { border-bottom:0; }
+            #prerollConfigPage .prActMeta { opacity:.65; font-size:.88em; }
+            #prerollConfigPage .prAct.ok .prActMsg { color:#4caf50; }
+            #prerollConfigPage .prAct.warn .prActMsg { color:#ff9800; }
         </style>
 
         <div data-role="content">
@@ -73,15 +78,31 @@
                             <span>Play before TV episodes</span>
                         </label>
                     </div>
+
+                    <!-- ───────── Delivery ───────── -->
+                    <h3 class="sectionTitle" style="margin-top:2em;">How pre-rolls reach your devices</h3>
+
+                    <div class="checkboxContainer">
+                        <label class="emby-checkbox-label">
+                            <input is="emby-checkbox" type="checkbox" id="chkWebPlayer" checked />
+                            <span>Web player integration (recommended)</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">
+                            Adds a small script to the Jellyfin web app, so browsers, Jellyfin Media Player, the Android phone app
+                            and WebView TV apps queue a pre-roll before <b>every</b> movie and episode, including any episode you pick
+                            and every episode that autoplays. Refresh open Jellyfin tabs/apps after changing this.
+                        </div>
+                    </div>
+
                     <div class="checkboxContainer">
                         <label class="emby-checkbox-label">
                             <input is="emby-checkbox" type="checkbox" id="chkAutoplay" checked />
-                            <span>Also play before every autoplayed episode</span>
+                            <span>Server fallback for other apps</span>
                         </label>
                         <div class="fieldDescription checkboxFieldDescription">
-                            Jellyfin apps only ask for pre-rolls when you press Play. With this on, the plugin also adds them when the
-                            next episode starts by itself (autoplay / Next) and on apps that skip pre-rolls. You may see a split second
-                            of the episode before the pre-roll takes over.
+                            For apps that don't use the web player (e.g. native TV apps): when a movie or episode starts without a
+                            pre-roll, the server tells the app to play the pre-roll first. You may see a split second of the episode
+                            first. Only works on apps that accept remote control.
                         </div>
                     </div>
 
@@ -159,6 +180,20 @@
                         <span>Save</span>
                     </button>
                 </form>
+
+                <!-- ───────── Activity ───────── -->
+                <div style="margin-top:2.5em;">
+                    <div class="flex align-items-center" style="gap:.6em; flex-wrap:wrap;">
+                        <h3 class="sectionTitle" style="margin:0; flex:1 1 auto;">Recent activity</h3>
+                        <button is="emby-button" type="button" id="btnRefreshActivity" class="raised prSmallBtn emby-button"><span>Refresh</span></button>
+                        <button is="emby-button" type="button" id="btnClearActivity" class="raised prSmallBtn emby-button"><span>Clear</span></button>
+                    </div>
+                    <div class="fieldDescription" style="margin:.5em 0 1em;">
+                        What happened on each play, newest first: which pre-roll was queued, played or skipped, and why.
+                        If something doesn't play, start the episode, tap <b>Refresh</b> and look here.
+                    </div>
+                    <div id="activityList" class="prBox" style="padding:.4em .8em;">—</div>
+                </div>
 
             </div>
         </div>
@@ -281,6 +316,7 @@
                         $('#chkEnableTvShows').checked = config.EnableForTvShows !== false;
                         $('#chkEnableMovies').checked = config.EnableForMovies !== false;
                         $('#chkAutoplay').checked = config.PlayBeforeAutoplay !== false;
+                        $('#chkWebPlayer').checked = config.EnableWebPlayerIntegration !== false;
 
                         $('#chkTagMatching').checked = config.EnableTagMatching !== false;
                         $('#chkAutoMatch').checked = config.AutoMatchSameTags !== false;
@@ -324,6 +360,7 @@
                         config.EnableForTvShows = $('#chkEnableTvShows').checked;
                         config.EnableForMovies = $('#chkEnableMovies').checked;
                         config.PlayBeforeAutoplay = $('#chkAutoplay').checked;
+                        config.EnableWebPlayerIntegration = $('#chkWebPlayer').checked;
                         config.ExcludedLibraryIds = Array.prototype.slice
                             .call(page.querySelectorAll('#excludeList .chkExclude'))
                             .filter(function (c) { return c.checked && norm(c.getAttribute('data-id')) !== norm(libId); })
@@ -352,8 +389,40 @@
                     });
                 }
 
+                // ── Activity ────────────────────────────────────────
+                function loadActivity() {
+                    var el = $('#activityList');
+                    ApiClient.getJSON(ApiClient.getUrl('PrerollVideos/Activity')).then(function (rows) {
+                        if (!rows || !rows.length) {
+                            el.innerHTML = '<div class="prAct">Nothing yet. Play a movie or episode, then tap Refresh.</div>';
+                            return;
+                        }
+                        el.innerHTML = rows.map(function (raw) {
+                            var r = {
+                                Time: raw.Time || raw.time, Source: raw.Source || raw.source, Device: raw.Device || raw.device,
+                                Item: raw.Item || raw.item, Message: raw.Message || raw.message, Level: raw.Level || raw.level
+                            };
+                            var t = new Date(r.Time);
+                            var when = isNaN(t) ? '' : t.toLocaleString();
+                            var meta = [when, r.Source, r.Device].filter(Boolean).map(escapeHtml).join(' · ');
+                            return '<div class="prAct ' + escapeHtml(r.Level || '') + '">' +
+                                '<div class="prActMeta">' + meta + '</div>' +
+                                (r.Item ? '<div><b>' + escapeHtml(r.Item) + '</b></div>' : '') +
+                                '<div class="prActMsg">' + escapeHtml(r.Message) + '</div></div>';
+                        }).join('');
+                    }).catch(function (err) {
+                        el.textContent = 'Could not load activity (' + (err && (err.status || err.message) || 'error') + ').';
+                    });
+                }
+
                 // ── Wiring ──────────────────────────────────────────
                 page.addEventListener('pageshow', loadConfig);
+                page.addEventListener('pageshow', loadActivity);
+                $('#btnRefreshActivity').addEventListener('click', loadActivity);
+                $('#btnClearActivity').addEventListener('click', function () {
+                    ApiClient.ajax({ type: 'DELETE', url: ApiClient.getUrl('PrerollVideos/Activity') })
+                        .then(loadActivity, loadActivity);
+                });
                 $('#selectPrerollLibrary').addEventListener('change', renderClipTags);
                 $('#chkTagMatching').addEventListener('change', toggleTagOptions);
                 $('#btnAddRule').addEventListener('click', function () { addRuleRow('', ''); });
