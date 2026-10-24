@@ -9,6 +9,22 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "2.2.0.0",
+        "changelog": "Pre-rolls before autoplayed episodes (and apps that skip intros); settings toggle",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/justhallwest-commits/jellyfin-preroll-ugreen/releases/download/v2.2.0/jellyfin-preroll-v2.2.0.zip",
+        "checksum": "6db44603472b39ed35462d82d4353a06",
+        "timestamp": "2026-10-24T00:00:00Z"
+      },
+      {
+        "version": "1.22.0.0",
+        "changelog": "Pre-rolls before autoplayed episodes (and apps that skip intros); settings toggle",
+        "targetAbi": "10.10.0.0",
+        "sourceUrl": "https://github.com/justhallwest-commits/jellyfin-preroll-ugreen/releases/download/v2.2.0/jellyfin-preroll-v2.2.0-jf10.10.zip",
+        "checksum": "c17f8608090d003baadba81cecb46334",
+        "timestamp": "2026-10-24T00:00:00Z"
+      },
+      {
         "version": "2.1.0.0",
         "changelog": "Tag matching (auto + rules + skip tags), fixed library list on the settings page",
         "targetAbi": "10.11.0.0",

@@ -1,14 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!--
+    Builds for Jellyfin 10.11 by default.
+    For Jellyfin 10.10:  dotnet publish -p:JellyfinAbi=10.10
+  -->
   <PropertyGroup>
-    <!-- Jellyfin 10.11.x runs on .NET 9 -->
-    <TargetFramework>net9.0</TargetFramework>
+    <JellyfinAbi Condition="'$(JellyfinAbi)' == ''">10.11</JellyfinAbi>
     <RootNamespace>JellyfinPreroll</RootNamespace>
     <AssemblyName>JellyfinPreroll</AssemblyName>
-    <!-- Overridden by the GitHub Actions workflow from the version you type in -->
-    <Version>2.0.0</Version>
-    <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <FileVersion>2.0.0.0</FileVersion>
+    <!-- Overridden by the GitHub Actions workflow -->
+    <Version>2.2.0</Version>
+    <AssemblyVersion>2.2.0.0</AssemblyVersion>
+    <FileVersion>2.2.0.0</FileVersion>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -16,18 +19,38 @@
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(JellyfinAbi)' == '10.10'">
+    <TargetFramework>net8.0</TargetFramework>
+    <JellyfinPackageVersion>10.10.7</JellyfinPackageVersion>
+    <HostingPackageVersion>8.0.1</HostingPackageVersion>
+    <DefineConstants>$(DefineConstants);JF1010</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinAbi)' != '10.10'">
+    <TargetFramework>net9.0</TargetFramework>
+    <JellyfinPackageVersion>10.11.6</JellyfinPackageVersion>
+    <HostingPackageVersion>9.0.0</HostingPackageVersion>
+  </PropertyGroup>
+
   <ItemGroup>
-    <!-- Same proven package set as v1.2.6; ExcludeAssets keeps Jellyfin's own DLLs out of the zip -->
-    <PackageReference Include="Jellyfin.Controller" Version="10.11.6">
+    <!-- ExcludeAssets keeps Jellyfin's own DLLs out of the zip -->
+    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinPackageVersion)">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="Jellyfin.Model" Version="10.11.6">
+    <PackageReference Include="Jellyfin.Model" Version="$(JellyfinPackageVersion)">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="Jellyfin.Data" Version="10.11.6">
+    <PackageReference Include="Jellyfin.Data" Version="$(JellyfinPackageVersion)">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="Jellyfin.Database.Implementations" Version="10.11.6">
+    <!-- IHostedService for the autoplay watcher (already part of Jellyfin's runtime) -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="$(HostingPackageVersion)">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(JellyfinAbi)' != '10.10'">
+    <PackageReference Include="Jellyfin.Database.Implementations" Version="$(JellyfinPackageVersion)">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
   </ItemGroup>

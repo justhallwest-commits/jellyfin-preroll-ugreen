@@ -6,6 +6,11 @@ It's a normal server-side Jellyfin plugin with builds for **Jellyfin 10.10** and
 ## Features
 - Pick a pre-roll library, 1–5 clips per play, shuffle (no back-to-back repeats) or sequential order, max clip length
 - Separate on/off switches for movies and TV episodes
+- **Pre-roll before every episode, including autoplay.** Jellyfin apps only ask for pre-rolls when you press Play.
+  When the next episode starts by itself (autoplay, Up Next, Next button), or on apps that never ask, the plugin tells the
+  device to play *pre-roll → that episode → the rest of the series*. It won't double up when the app already played a pre-roll,
+  and it skips resumed playback. You may see a split second of the episode before the pre-roll takes over. Toggle:
+  "Also play before every autoplayed episode".
 - **Tag matching**
   - Same tag names match automatically: a clip tagged `Horror` plays before media tagged `Horror` (case doesn't matter)
   - Shows pass their tags down to every season and episode
@@ -51,7 +56,8 @@ The 10.10 build gets version `1.<major×10+minor>.<patch>.0` (e.g. 2.2.0 → 1.2
 | Checksum error on install | The zip attached to the release doesn't match `manifest.json`. Re-upload the exact file. |
 | Library list empty | Refresh the page once the library scan finishes. Any error is shown in orange at the top. |
 | Tagged clip never plays | Check the spelling against the "Tags on your pre-roll clips" list, and that the movie or show really has that tag. |
-| Plays on web, not on one TV app | That app doesn't request intros. This is a client limitation. |
+| Only the first episode gets a pre-roll | Update to 2.2.0 or later and keep "Also play before every autoplayed episode" on. |
+| A device never gets autoplay pre-rolls | It doesn't accept remote control. The log says "can't be remote-controlled". |
 
 ## Files
 ```
@@ -60,7 +66,9 @@ JellyfinPreroll/                      plugin source (net8.0 for 10.10, net9.0 fo
   Plugin.cs                           GUID a4b2c3d4-e5f6-7890-abcd-ef1234567891
   PluginConfiguration.cs              settings incl. tag rules
   PluginServiceRegistrar.cs
-  PrerollIntroProvider.cs             clip selection, tag matching, exclusions, loop protection
+  PrerollSelector.cs                  clip selection, tag matching, exclusions, loop protection
+  PrerollIntroProvider.cs             pre-rolls when Play is pressed
+  PrerollSessionWatcher.cs            pre-rolls for autoplayed episodes / apps that skip intros
   Configuration/configPage.html       Dashboard settings page (script must stay inside the page div)
 manifest.json                         Jellyfin plugin repository feed
 ```

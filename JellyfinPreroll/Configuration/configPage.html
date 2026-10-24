@@ -4,8 +4,23 @@
     <title>Pre-Roll Videos</title>
 </head>
 <body>
+    <!--
+      IMPORTANT: Jellyfin only keeps the <div data-role="page"> element of a plugin page.
+      The <script> must stay INSIDE this div or it never runs.
+    -->
     <div id="prerollConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
          data-require="emby-select,emby-input,emby-checkbox,emby-button">
+
+        <style>
+            #prerollConfigPage .prRule { display:flex; gap:.6em; align-items:center; margin-bottom:.6em; flex-wrap:wrap; }
+            #prerollConfigPage .prRule input { flex:1 1 12em; min-width:10em; padding:.55em .7em; border-radius:.2em;
+                border:1px solid rgba(128,128,128,.4); background:rgba(0,0,0,.15); color:inherit; font:inherit; }
+            #prerollConfigPage .prArrow { opacity:.7; }
+            #prerollConfigPage .prChip { display:inline-block; padding:.2em .65em; margin:.15em .3em .15em 0;
+                border-radius:1em; background:rgba(0,164,220,.18); font-size:.9em; }
+            #prerollConfigPage .prBox { padding:1em 1.2em; border-radius:.3em; background:rgba(128,128,128,.08); margin-bottom:1.5em; }
+            #prerollConfigPage .prSmallBtn { padding:.45em .9em; min-width:0; margin:0; }
+        </style>
 
         <div data-role="content">
             <div class="content-primary">
@@ -17,17 +32,13 @@
 
                     <div id="prerollMsg" style="color: orange; margin-bottom: 1em; display: none;"></div>
 
-                    <p class="fieldDescription" style="margin-bottom:1.5em;">
-                        Pick the library that holds your pre-roll clips (studio logos, bumpers, intros).
-                        They play before movies and/or TV episodes when an item is started from the beginning.
-                    </p>
-
+                    <!-- ───────── Basics ───────── -->
                     <div class="selectContainer">
                         <label class="selectLabel" for="selectPrerollLibrary">Pre-roll library</label>
                         <select is="emby-select" id="selectPrerollLibrary" class="emby-select-withcolor">
                             <option value="">Loading libraries…</option>
                         </select>
-                        <div class="fieldDescription">Tip: create this library as type "Home Videos and Photos" or "Movies" pointing at a folder of short clips.</div>
+                        <div class="fieldDescription">The library that holds your pre-roll clips.</div>
                     </div>
 
                     <div class="inputContainer">
@@ -56,14 +67,89 @@
                             <span>Play before movies</span>
                         </label>
                     </div>
-
                     <div class="checkboxContainer">
                         <label class="emby-checkbox-label">
                             <input is="emby-checkbox" type="checkbox" id="chkEnableTvShows" checked />
                             <span>Play before TV episodes</span>
                         </label>
                     </div>
+                    <div class="checkboxContainer">
+                        <label class="emby-checkbox-label">
+                            <input is="emby-checkbox" type="checkbox" id="chkAutoplay" checked />
+                            <span>Also play before every autoplayed episode</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">
+                            Jellyfin apps only ask for pre-rolls when you press Play. With this on, the plugin also adds them when the
+                            next episode starts by itself (autoplay / Next) and on apps that skip pre-rolls. You may see a split second
+                            of the episode before the pre-roll takes over.
+                        </div>
+                    </div>
 
+                    <!-- ───────── Tag matching ───────── -->
+                    <h3 class="sectionTitle" style="margin-top:2em;">Match pre-rolls to tags</h3>
+
+                    <div class="prBox">
+                        <div class="fieldDescription" style="margin:0;">
+                            Add tags to your pre-roll clips (clip → ⋮ → <b>Edit metadata</b> → <b>Tags</b>).
+                            A clip tagged <i>Horror</i> plays before movies or shows tagged <i>Horror</i>.
+                            Shows pass their tags down to their episodes.
+                            Clips with <b>no tags</b> are your general pre-rolls.
+                        </div>
+                        <div style="margin-top:.8em;"><b>Tags on your pre-roll clips:</b> <span id="clipTags">—</span></div>
+                    </div>
+
+                    <div class="checkboxContainer">
+                        <label class="emby-checkbox-label">
+                            <input is="emby-checkbox" type="checkbox" id="chkTagMatching" checked />
+                            <span>Turn on tag matching</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Off = any clip can play before anything.</div>
+                    </div>
+
+                    <div id="tagOptions">
+                        <div class="checkboxContainer">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="chkAutoMatch" checked />
+                                <span>Match same tag names automatically</span>
+                            </label>
+                        </div>
+
+                        <div class="checkboxContainer">
+                            <label class="emby-checkbox-label">
+                                <input is="emby-checkbox" type="checkbox" id="chkFillGeneral" checked />
+                                <span>Fill leftover slots with general clips</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Used when "Clips per play" is more than the number of matching clips.</div>
+                        </div>
+
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="selectNoMatch">When nothing matches</label>
+                            <select is="emby-select" id="selectNoMatch" class="emby-select-withcolor">
+                                <option value="PlayGeneral">Play general (untagged) clips</option>
+                                <option value="PlayAny">Play any clip</option>
+                                <option value="PlayNothing">Play no pre-roll</option>
+                            </select>
+                        </div>
+
+                        <h4 style="margin:1.5em 0 .4em;">Tag rules</h4>
+                        <div class="fieldDescription" style="margin-bottom:.8em;">
+                            Use rules when the names differ. Example: media tag <i>Marvel</i> → clip tag <i>MarvelIntro</i>.
+                        </div>
+                        <div id="ruleList"></div>
+                        <button is="emby-button" type="button" id="btnAddRule" class="raised prSmallBtn emby-button">
+                            <span>+ Add rule</span>
+                        </button>
+
+                        <div class="inputContainer" style="margin-top:1.8em;">
+                            <label class="inputLabel" for="inputSkipTags">Never play pre-rolls before media tagged</label>
+                            <input is="emby-input" type="text" id="inputSkipTags" placeholder="e.g. NoPreroll, Kids" list="prTagList" />
+                            <div class="fieldDescription">Comma-separated.</div>
+                        </div>
+                    </div>
+
+                    <datalist id="prTagList"></datalist>
+
+                    <!-- ───────── Library exclusions ───────── -->
                     <h3 class="sectionTitle" style="margin-top:2em;">Skip these libraries</h3>
                     <div class="fieldDescription" style="margin-bottom:.75em;">Items in checked libraries never get pre-rolls.</div>
                     <div id="excludeList"></div>
@@ -76,123 +162,208 @@
 
             </div>
         </div>
+
+        <script type="text/javascript">
+            (function () {
+                'use strict';
+
+                var pluginId = 'a4b2c3d4-e5f6-7890-abcd-ef1234567891';
+                var page = document.querySelector('#prerollConfigPage');
+                var $ = function (sel) { return page.querySelector(sel); };
+                var allTags = [];
+
+                function msg(text) {
+                    var el = $('#prerollMsg');
+                    el.style.display = text ? 'block' : 'none';
+                    el.textContent = text || '';
+                }
+
+                function norm(id) { return (id || '').toString().replace(/-/g, '').toLowerCase(); }
+
+                function escapeHtml(s) {
+                    return String(s).replace(/[&<>"']/g, function (c) {
+                        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+                    });
+                }
+
+                // ── Server calls ────────────────────────────────────
+                function getLibraries() {
+                    if (typeof ApiClient.getVirtualFolders === 'function') {
+                        return ApiClient.getVirtualFolders();
+                    }
+                    return ApiClient.getJSON(ApiClient.getUrl('Library/VirtualFolders'));
+                }
+
+                function getTags(parentId) {
+                    var params = { UserId: ApiClient.getCurrentUserId(), Recursive: true };
+                    if (parentId) { params.ParentId = parentId; }
+                    return ApiClient.getJSON(ApiClient.getUrl('Items/Filters', params))
+                        .then(function (r) { return (r && r.Tags) || []; })
+                        .catch(function () { return []; });
+                }
+
+                // ── Rendering ───────────────────────────────────────
+                function renderLibraries(folders, config) {
+                    var select = $('#selectPrerollLibrary');
+                    var excludeList = $('#excludeList');
+                    var current = norm(config.PrerollLibraryId);
+                    var excluded = (config.ExcludedLibraryIds || []).map(norm);
+
+                    select.innerHTML = '<option value="">— None (plugin off) —</option>';
+                    excludeList.innerHTML = '';
+
+                    folders.forEach(function (f) {
+                        var id = f.ItemId || f.Id || '';
+                        var opt = document.createElement('option');
+                        opt.value = id;
+                        opt.textContent = f.Name;
+                        if (norm(id) === current) { opt.selected = true; }
+                        select.appendChild(opt);
+
+                        var wrap = document.createElement('div');
+                        wrap.className = 'checkboxContainer';
+                        wrap.innerHTML = '<label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" class="chkExclude" /><span></span></label>';
+                        var chk = wrap.querySelector('input');
+                        chk.setAttribute('data-id', id);
+                        chk.checked = excluded.indexOf(norm(id)) !== -1;
+                        wrap.querySelector('span').textContent = f.Name;
+                        excludeList.appendChild(wrap);
+                    });
+
+                    if (!folders.length) { msg('No libraries found. Add your pre-roll library first.'); }
+                }
+
+                function renderClipTags() {
+                    var libId = $('#selectPrerollLibrary').value;
+                    var el = $('#clipTags');
+                    if (!libId) { el.textContent = '— pick a pre-roll library —'; return; }
+                    el.textContent = 'loading…';
+                    getTags(libId).then(function (tags) {
+                        el.innerHTML = tags.length
+                            ? tags.map(function (t) { return '<span class="prChip">' + escapeHtml(t) + '</span>'; }).join('')
+                            : 'none yet. Every clip counts as a general pre-roll.';
+                    });
+                }
+
+                function fillDatalist() {
+                    $('#prTagList').innerHTML = allTags.map(function (t) {
+                        return '<option value="' + escapeHtml(t) + '"></option>';
+                    }).join('');
+                }
+
+                function addRuleRow(mediaTag, prerollTag) {
+                    var row = document.createElement('div');
+                    row.className = 'prRule';
+                    row.innerHTML =
+                        '<input type="text" class="ruleMedia" list="prTagList" placeholder="Media tag" />' +
+                        '<span class="prArrow">→ play clips tagged</span>' +
+                        '<input type="text" class="rulePreroll" list="prTagList" placeholder="Clip tag" />' +
+                        '<button is="emby-button" type="button" class="raised prSmallBtn emby-button btnRemove" title="Remove"><span>✕</span></button>';
+                    row.querySelector('.ruleMedia').value = mediaTag || '';
+                    row.querySelector('.rulePreroll').value = prerollTag || '';
+                    row.querySelector('.btnRemove').addEventListener('click', function () { row.remove(); });
+                    $('#ruleList').appendChild(row);
+                }
+
+                function toggleTagOptions() {
+                    $('#tagOptions').style.opacity = $('#chkTagMatching').checked ? '1' : '.45';
+                }
+
+                // ── Load / save ─────────────────────────────────────
+                function loadConfig() {
+                    msg('');
+                    Dashboard.showLoadingMsg();
+
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        $('#inputPrerollCount').value = config.PrerollCount || 1;
+                        $('#inputMaxDuration').value = config.MaxDurationSeconds || 0;
+                        $('#selectOrder').value = (config.Order === 'Sequential' || config.Order === 1) ? 'Sequential' : 'Shuffle';
+                        $('#chkEnableTvShows').checked = config.EnableForTvShows !== false;
+                        $('#chkEnableMovies').checked = config.EnableForMovies !== false;
+                        $('#chkAutoplay').checked = config.PlayBeforeAutoplay !== false;
+
+                        $('#chkTagMatching').checked = config.EnableTagMatching !== false;
+                        $('#chkAutoMatch').checked = config.AutoMatchSameTags !== false;
+                        $('#chkFillGeneral').checked = config.FillWithGeneral !== false;
+                        var nm = config.WhenNoMatch;
+                        $('#selectNoMatch').value =
+                            (nm === 'PlayAny' || nm === 1) ? 'PlayAny' :
+                            (nm === 'PlayNothing' || nm === 2) ? 'PlayNothing' : 'PlayGeneral';
+                        $('#inputSkipTags').value = (config.SkipTags || []).join(', ');
+                        $('#ruleList').innerHTML = '';
+                        (config.TagRules || []).forEach(function (r) { addRuleRow(r.MediaTag, r.PrerollTag); });
+                        toggleTagOptions();
+
+                        return getLibraries().then(function (folders) {
+                            renderLibraries(folders || [], config);
+                            renderClipTags();
+                        }, function (err) {
+                            msg('Could not load the library list (' + (err && (err.status || err.message) || 'unknown error') + '). Refresh the page to try again.');
+                        });
+                    }).catch(function (err) {
+                        msg('Could not load plugin settings (' + (err && (err.status || err.message) || 'unknown error') + ').');
+                    }).then(function () {
+                        Dashboard.hideLoadingMsg();
+                    });
+
+                    getTags(null).then(function (tags) { allTags = tags; fillDatalist(); });
+                }
+
+                function splitTags(s) {
+                    return (s || '').split(',').map(function (t) { return t.trim(); }).filter(Boolean);
+                }
+
+                function saveConfig() {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        var libId = $('#selectPrerollLibrary').value;
+                        config.PrerollLibraryId = libId;
+                        config.PrerollCount = Math.min(5, Math.max(1, parseInt($('#inputPrerollCount').value, 10) || 1));
+                        config.MaxDurationSeconds = Math.max(0, parseInt($('#inputMaxDuration').value, 10) || 0);
+                        config.Order = $('#selectOrder').value;
+                        config.EnableForTvShows = $('#chkEnableTvShows').checked;
+                        config.EnableForMovies = $('#chkEnableMovies').checked;
+                        config.PlayBeforeAutoplay = $('#chkAutoplay').checked;
+                        config.ExcludedLibraryIds = Array.prototype.slice
+                            .call(page.querySelectorAll('#excludeList .chkExclude'))
+                            .filter(function (c) { return c.checked && norm(c.getAttribute('data-id')) !== norm(libId); })
+                            .map(function (c) { return c.getAttribute('data-id'); });
+
+                        config.EnableTagMatching = $('#chkTagMatching').checked;
+                        config.AutoMatchSameTags = $('#chkAutoMatch').checked;
+                        config.FillWithGeneral = $('#chkFillGeneral').checked;
+                        config.WhenNoMatch = $('#selectNoMatch').value;
+                        config.SkipTags = splitTags($('#inputSkipTags').value);
+                        config.TagRules = Array.prototype.slice.call(page.querySelectorAll('#ruleList .prRule'))
+                            .map(function (row) {
+                                return {
+                                    MediaTag: row.querySelector('.ruleMedia').value.trim(),
+                                    PrerollTag: row.querySelector('.rulePreroll').value.trim()
+                                };
+                            })
+                            .filter(function (r) { return r.MediaTag && r.PrerollTag; });
+
+                        return ApiClient.updatePluginConfiguration(pluginId, config);
+                    }).then(function (result) {
+                        Dashboard.processPluginConfigurationUpdateResult(result);
+                    }).catch(function (err) {
+                        Dashboard.hideLoadingMsg();
+                        msg('Save failed (' + (err && (err.status || err.message) || 'unknown error') + ').');
+                    });
+                }
+
+                // ── Wiring ──────────────────────────────────────────
+                page.addEventListener('pageshow', loadConfig);
+                $('#selectPrerollLibrary').addEventListener('change', renderClipTags);
+                $('#chkTagMatching').addEventListener('change', toggleTagOptions);
+                $('#btnAddRule').addEventListener('click', function () { addRuleRow('', ''); });
+                $('#prerollConfigForm').addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    saveConfig();
+                    return false;
+                });
+            })();
+        </script>
     </div>
-
-    <script type="text/javascript">
-        (function () {
-            'use strict';
-
-            var pluginId = 'a4b2c3d4-e5f6-7890-abcd-ef1234567891';
-            var page = document.getElementById('prerollConfigPage');
-            var loaded = false;
-
-            function msg(text) {
-                var el = document.getElementById('prerollMsg');
-                el.style.display = text ? 'block' : 'none';
-                el.textContent = text || '';
-            }
-
-            function norm(id) {
-                return (id || '').toString().replace(/-/g, '').toLowerCase();
-            }
-
-            function fetchLibraries() {
-                var api = window.ApiClient;
-                return fetch(api.getUrl('Library/VirtualFolders'), {
-                    headers: { 'Authorization': 'MediaBrowser Token="' + api.accessToken() + '"' }
-                }).then(function (r) {
-                    if (!r.ok) { throw new Error('HTTP ' + r.status); }
-                    return r.json();
-                });
-            }
-
-            function render(folders, config) {
-                var select = document.getElementById('selectPrerollLibrary');
-                var excludeList = document.getElementById('excludeList');
-                var current = norm(config.PrerollLibraryId);
-                var excluded = (config.ExcludedLibraryIds || []).map(norm);
-
-                select.innerHTML = '<option value="">— None (plugin off) —</option>';
-                excludeList.innerHTML = '';
-
-                folders.forEach(function (f) {
-                    var id = f.ItemId || f.Id || '';
-                    var opt = document.createElement('option');
-                    opt.value = id;
-                    opt.textContent = f.Name;
-                    if (norm(id) === current) { opt.selected = true; }
-                    select.appendChild(opt);
-
-                    var wrap = document.createElement('div');
-                    wrap.className = 'checkboxContainer';
-                    wrap.innerHTML =
-                        '<label class="emby-checkbox-label">' +
-                        '<input is="emby-checkbox" type="checkbox" class="chkExclude" />' +
-                        '<span></span></label>';
-                    var chk = wrap.querySelector('input');
-                    chk.setAttribute('data-id', id);
-                    chk.checked = excluded.indexOf(norm(id)) !== -1;
-                    wrap.querySelector('span').textContent = f.Name;
-                    excludeList.appendChild(wrap);
-                });
-
-                if (!folders.length) { msg('No libraries found — add your pre-roll library first.'); }
-            }
-
-            function loadConfig() {
-                if (!window.ApiClient) { setTimeout(loadConfig, 300); return; }
-                loaded = true;
-                msg('');
-                Dashboard.showLoadingMsg();
-
-                Promise.all([ApiClient.getPluginConfiguration(pluginId), fetchLibraries()])
-                    .then(function (res) {
-                        var config = res[0];
-                        render(res[1] || [], config);
-                        document.getElementById('inputPrerollCount').value = config.PrerollCount || 1;
-                        document.getElementById('inputMaxDuration').value = config.MaxDurationSeconds || 0;
-                        document.getElementById('selectOrder').value =
-                            (config.Order === 'Sequential' || config.Order === 1) ? 'Sequential' : 'Shuffle';
-                        document.getElementById('chkEnableTvShows').checked = config.EnableForTvShows !== false;
-                        document.getElementById('chkEnableMovies').checked = config.EnableForMovies !== false;
-                    })
-                    .catch(function (err) { msg('Could not load settings: ' + err.message); })
-                    .finally(function () { Dashboard.hideLoadingMsg(); });
-            }
-
-            function saveConfig() {
-                Dashboard.showLoadingMsg();
-                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
-                    var libId = document.getElementById('selectPrerollLibrary').value;
-                    config.PrerollLibraryId = libId;
-                    config.PrerollCount = Math.min(5, Math.max(1, parseInt(document.getElementById('inputPrerollCount').value, 10) || 1));
-                    config.MaxDurationSeconds = Math.max(0, parseInt(document.getElementById('inputMaxDuration').value, 10) || 0);
-                    config.Order = document.getElementById('selectOrder').value;
-                    config.EnableForTvShows = document.getElementById('chkEnableTvShows').checked;
-                    config.EnableForMovies = document.getElementById('chkEnableMovies').checked;
-                    config.ExcludedLibraryIds = Array.prototype.slice
-                        .call(document.querySelectorAll('#excludeList .chkExclude'))
-                        .filter(function (c) { return c.checked && norm(c.getAttribute('data-id')) !== norm(libId); })
-                        .map(function (c) { return c.getAttribute('data-id'); });
-
-                    return ApiClient.updatePluginConfiguration(pluginId, config);
-                }).then(function (result) {
-                    Dashboard.processPluginConfigurationUpdateResult(result);
-                }).catch(function (err) {
-                    Dashboard.hideLoadingMsg();
-                    msg('Save failed: ' + err.message);
-                });
-            }
-
-            page.addEventListener('pageshow', loadConfig);
-            setTimeout(function () { if (!loaded) { loadConfig(); } }, 1500);
-
-            document.getElementById('prerollConfigForm').addEventListener('submit', function (e) {
-                e.preventDefault();
-                saveConfig();
-                return false;
-            });
-        })();
-    </script>
 </body>
 </html>
