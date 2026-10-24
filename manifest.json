@@ -9,6 +9,22 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "3.0.0.0",
+        "changelog": "3.0: new tabbed settings page with health check and fixes, genre/studio/rating matching, rules on any detail, seasonal schedules with presets, cinema-style sequence, frequency limit, skip users, clips manager, test tool, backup",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/justhallwest-commits/jellyfin-preroll-ugreen/releases/download/v3.0.0/jellyfin-preroll-v3.0.0.zip",
+        "checksum": "c8d113750cb1189e635e3169c07ea5df",
+        "timestamp": "2026-10-24T15:00:00Z"
+      },
+      {
+        "version": "1.30.0.0",
+        "changelog": "3.0: new tabbed settings page with health check and fixes, genre/studio/rating matching, rules on any detail, seasonal schedules with presets, cinema-style sequence, frequency limit, skip users, clips manager, test tool, backup",
+        "targetAbi": "10.10.0.0",
+        "sourceUrl": "https://github.com/justhallwest-commits/jellyfin-preroll-ugreen/releases/download/v3.0.0/jellyfin-preroll-v3.0.0-jf10.10.zip",
+        "checksum": "364931a9983df33c6ea6b03003686a6d",
+        "timestamp": "2026-10-24T15:00:00Z"
+      },
+      {
         "version": "2.3.0.0",
         "changelog": "Pre-roll before every movie and episode: web player integration (fixes only-S01E01), recent activity panel, improved server fallback",
         "targetAbi": "10.11.0.0",
