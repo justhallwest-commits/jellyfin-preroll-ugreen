@@ -1,112 +1,66 @@
-# Jellyfin Preroll Ugreen — Pre-Roll Videos v2.0.0
+# Jellyfin Preroll Ugreen: Pre-Roll Videos
 
 Plays clips from a library you choose (studio logos, HallFlix bumpers, intros) before movies and/or TV episodes.
-It's a normal server-side Jellyfin plugin, so it runs the same on a UGREEN NAS as on any other Jellyfin 10.11 server.
+It's a normal server-side Jellyfin plugin with builds for **Jellyfin 10.10** and **10.11**. The Jellyfin catalog picks the right build for your server automatically.
 
-**What's new in 2.0.0**
-- Skip-these-libraries checkboxes (e.g. Kids, Home Videos)
-- Order: Shuffle (won't repeat the clip that just played) or Sequential (rotates A→Z)
-- Loop protection: anything inside the pre-roll library never gets a pre-roll itself
-- Music-video items count as pre-rolls too
-- Fixed CI build: .NET 9 for Jellyfin 10.11, and one plugin GUID everywhere so your old settings carry over
-- Releasing is one button: the workflow builds, publishes the release, and updates `manifest.json` with the checksum
+## Features
+- Pick a pre-roll library, 1–5 clips per play, shuffle (no back-to-back repeats) or sequential order, max clip length
+- Separate on/off switches for movies and TV episodes
+- **Tag matching**
+  - Same tag names match automatically: a clip tagged `Horror` plays before media tagged `Horror` (case doesn't matter)
+  - Shows pass their tags down to every season and episode
+  - **Tag rules** for when names differ: media tag `Marvel` → clips tagged `MarvelIntro`
+  - Clips with no tags are your *general* pre-rolls
+  - Choose what happens when nothing matches: general clips, any clip, or nothing
+  - Leftover slots can be filled with general clips
+  - **Skip tags**: media tagged e.g. `NoPreroll` never gets a pre-roll
+- Skip whole libraries (Kids, Home Videos…)
+- Loop protection: clips in the pre-roll library never get a pre-roll themselves
 
-**Requires:** Jellyfin **10.11.x** (Dashboard → About shows the version).
-
----
-
-## Part 1: Set up this repository (web UI only)
-
-This repo already includes a pre-built release, so you don't need to build anything to install.
-
-1. Upload everything in this folder (`.github`, `JellyfinPreroll`, `manifest.json`, `README.md`) with **Add file → Upload files**, and commit to `main`.
-2. **Releases → Draft a new release** → tag `v2.0.0` (**Create new tag**) → title `v2.0.0`.
-   Attach `jellyfin-preroll-v2.0.0.zip` with the name unchanged → **Publish release**.
-
-## Part 2: Future updates (optional)
-
-Edit the code on GitHub, then go to **Actions → Build & Release Plugin → Run workflow** and enter a new version such as `2.0.1`.
-The workflow builds the plugin on GitHub, publishes the release, and updates `manifest.json` for you.
-
----
-
-## Part 3: Install on the UGREEN NAS
-
-### Step 0: Check your Jellyfin version
-Open Jellyfin (App Center → Jellyfin, or `http://<NAS-IP>:<port>`) → **Dashboard → About**.
-- **10.11.x**: continue.
-- **10.10 or older**: the plugin won't load. In UGOS, update Jellyfin from App Center. If App Center doesn't offer 10.11 yet, run the official `jellyfin/jellyfin` image yourself in **Docker → Project → Create** (UGREEN's Docker Compose method).
-
-### Step 1: Make a pre-roll folder Jellyfin can see
-The UGREEN Jellyfin app only sees the folders you gave it as **resource access paths** during install.
-- Easiest: create a `Prerolls` folder **inside a media folder Jellyfin already uses**, e.g. `Media/Prerolls`.
-- Copy your clips in (MP4/H.264 works best on every client; keep them short).
-
-### Step 2: Create the pre-roll library
-Dashboard → **Libraries → Add Media Library**
-- Content type: **Home Videos and Photos** (or Movies)
-- Display name: `Prerolls`
-- Folder: the Prerolls folder from Step 1 (as Jellyfin sees it, e.g. `/media/Prerolls`)
-- Turn off the metadata downloaders so it doesn't try to match logos to films.
-- Let the scan finish.
-
-> Keep each user's **library access** to Prerolls turned on, or their clients may refuse to play the clips.
-> To keep it off the home screen, hide it per profile under **Settings → Home**.
-
-### Step 3: Install the plugin
-
-#### Method A — Plugin repository (recommended, no file access needed)
-1. Dashboard → **Plugins → Repositories** (gear / "Manage repositories") → **+**
-2. Name: `HallFlix`
+## Install (Jellyfin dashboard, no terminal)
+1. Dashboard → **Plugins → Repositories → +**
    URL: `https://raw.githubusercontent.com/justhallwest-commits/jellyfin-preroll-ugreen/main/manifest.json`
-3. **Plugins → Catalog** → **Pre-Roll Videos** → choose **2.0.0.0** → **Install**.
-4. Restart Jellyfin: Dashboard → **Restart**, or in UGOS **Docker → Containers → jellyfin → Restart**.
+2. **Catalog → Pre-Roll Videos → Install** (the newest version that fits your server is chosen).
+3. Restart Jellyfin (Dashboard → Restart, or UGOS Docker → Containers → jellyfin → Restart).
 
-Future versions then show up as updates in the Jellyfin plugin page automatically.
+## Setup
+1. Put your clips in a folder Jellyfin can see, e.g. `Media/Prerolls`. MP4/H.264 works best on every client.
+2. Dashboard → **Libraries → Add Media Library**: type *Home Videos and Photos* (or Movies), name `Prerolls`, metadata downloaders off.
+3. **Tag the clips** you want matched: open a clip → ⋮ → **Edit metadata** → **Tags** → add e.g. `Horror` → Save.
+   Leave general clips untagged.
+4. Make sure your movies and shows have matching tags. Tags on a **show** count for all of its episodes.
+5. Dashboard → **Plugins → Pre-Roll Videos**: pick the library, set your options and rules, then **Save**.
+   The page lists the tags it found on your clips so you can check the spelling.
 
-#### Method B — Manual DLL drop
-Use this only if you set a **plugin path** when you installed Jellyfin from App Center.
-The default config folder lives in a hidden `@appstore` area that UGOS Files doesn't show.
-1. Download `jellyfin-preroll-v2.0.0.zip` from the GitHub release and unzip it to get `JellyfinPreroll.dll`.
-2. In UGOS **Docker → Containers → jellyfin → Storage/Volumes**, find which NAS folder is mounted to Jellyfin's plugin folder (`/config/plugins`).
-3. In that NAS folder, create a folder named `Pre-Roll Videos_2.0.0.0` and copy `JellyfinPreroll.dll` into it.
-4. Restart the Jellyfin container.
+## Test
+Start an item **from the beginning** in a web browser. Then go to Dashboard → **Logs**, open the newest log, and search `Pre-Roll Videos`. Each play is logged with the clips chosen and why, for example
+`playing 1 pre-roll(s) before "Halloween" [matched tags: Horror]: Spooky`.
+- Resuming never plays pre-rolls.
+- Each client app decides whether to request intros. Web and most official apps do, but test each device you use.
 
-### Step 4: Configure
-Dashboard → **Plugins → Pre-Roll Videos**
-- Pre-roll library: **Prerolls**
-- Clips per play, Order, Max clip length
-- Before movies / Before TV episodes
-- Skip these libraries: check any libraries that should never get pre-rolls
-- **Save**
-
-### Step 5: Test
-Start a movie **from the beginning** in a web browser. The clip should play first.
-- Pre-rolls only play on a fresh start, never when resuming.
-- Each client app decides whether to ask the server for intros. Web and most official apps do, but test each device you use (Fire TV, Roku, phones).
-- Dashboard → **Logs** → open the newest log and search `Pre-Roll Videos` to see which clips were picked or why one was skipped.
-
----
+## Releasing an update (GitHub website only)
+**Actions → Build & Release Plugin → Run workflow** → type a version like `2.2.0`.
+One release is created with two zips (10.11 and 10.10), and `manifest.json` is updated automatically.
+The 10.10 build gets version `1.<major×10+minor>.<patch>.0` (e.g. 2.2.0 → 1.22.0.0) so a 10.11 server never picks it.
 
 ## Troubleshooting
-
 | Symptom | Fix |
 |---|---|
-| Plugin listed as **NotSupported / Malfunctioned** | Jellyfin isn't 10.11.x. Update it (Step 0). |
-| Not in Catalog | Make sure Part 2 finished and `manifest.json` on GitHub lists 2.0.0.0. Then Dashboard → Scheduled Tasks → *Update Plugins*, or restart. |
-| Checksum error on install | Run the workflow again with the same version. It rebuilds the zip and rewrites the checksum. |
-| Library dropdown empty | Refresh the page after the library scan finishes. |
-| Log says "has no usable videos" | The library scan hasn't finished, or Max clip length is filtering everything out. |
-| Clips play on web but not on one TV app | That app doesn't request intros. It's a client limitation, not the plugin. |
+| Not in Catalog | Dashboard → Scheduled Tasks → *Update Plugins* ▶, then Ctrl+F5. Check `manifest.json` loads in a browser. |
+| Plugin shows **Malfunctioned** | Dashboard → Logs, search `JellyfinPreroll`. Most likely the wrong build for the server version. |
+| Checksum error on install | The zip attached to the release doesn't match `manifest.json`. Re-upload the exact file. |
+| Library list empty | Refresh the page once the library scan finishes. Any error is shown in orange at the top. |
+| Tagged clip never plays | Check the spelling against the "Tags on your pre-roll clips" list, and that the movie or show really has that tag. |
+| Plays on web, not on one TV app | That app doesn't request intros. This is a client limitation. |
 
 ## Files
 ```
 .github/workflows/build-release.yml   test build on every commit; Run workflow = release + manifest update
-JellyfinPreroll/                      plugin source (net9.0, Jellyfin 10.11)
+JellyfinPreroll/                      plugin source (net8.0 for 10.10, net9.0 for 10.11)
   Plugin.cs                           GUID a4b2c3d4-e5f6-7890-abcd-ef1234567891
-  PluginConfiguration.cs
+  PluginConfiguration.cs              settings incl. tag rules
   PluginServiceRegistrar.cs
-  PrerollIntroProvider.cs             picks clips, exclusions, loop protection
-  Configuration/configPage.html       Dashboard settings page
+  PrerollIntroProvider.cs             clip selection, tag matching, exclusions, loop protection
+  Configuration/configPage.html       Dashboard settings page (script must stay inside the page div)
 manifest.json                         Jellyfin plugin repository feed
 ```

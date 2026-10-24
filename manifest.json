@@ -9,6 +9,22 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "2.1.0.0",
+        "changelog": "Tag matching (auto + rules + skip tags), fixed library list on the settings page",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/justhallwest-commits/jellyfin-preroll-ugreen/releases/download/v2.1.0/jellyfin-preroll-v2.1.0.zip",
+        "checksum": "f8c3aac511039a9ec9a022d46f7e07df",
+        "timestamp": "2026-10-23T00:00:00Z"
+      },
+      {
+        "version": "1.21.0.0",
+        "changelog": "Tag matching (auto + rules + skip tags), fixed library list on the settings page",
+        "targetAbi": "10.10.0.0",
+        "sourceUrl": "https://github.com/justhallwest-commits/jellyfin-preroll-ugreen/releases/download/v2.1.0/jellyfin-preroll-v2.1.0-jf10.10.zip",
+        "checksum": "fe3271998d256957982f6e3dd8187835",
+        "timestamp": "2026-10-23T00:00:00Z"
+      },
+      {
         "version": "2.0.0.0",
         "changelog": "UGREEN-ready release: library exclusions, shuffle/sequential order, loop protection",
         "targetAbi": "10.11.0.0",
