@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "3.0.0.12",
+        "changelog": "Build for Jellyfin 12.x (.NET 10)",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/justhallwest-commits/jellyfin-preroll-ugreen/releases/download/v3.0.0-jf12/jellyfin-preroll-v3.0.0.12-jf12.zip",
+        "checksum": "e2deab03fa9423ddd81ce87dfbc5c0cb",
+        "timestamp": "2026-10-28T19:03:33Z"
+      },
+      {
         "version": "3.0.0.0",
         "changelog": "3.0: new tabbed settings page with health check and fixes, genre/studio/rating matching, rules on any detail, seasonal schedules with presets, cinema-style sequence, frequency limit, skip users, clips manager, test tool, backup",
         "targetAbi": "10.11.0.0",
