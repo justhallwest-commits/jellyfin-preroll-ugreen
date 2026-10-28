@@ -3,6 +3,7 @@
   <!--
     Builds for Jellyfin 10.11 by default.
     For Jellyfin 10.10:  dotnet publish -p:JellyfinAbi=10.10
+    For Jellyfin 12:     dotnet publish -p:JellyfinAbi=12   (optionally -p:JellyfinPackageVersion=12.x.y)
   -->
   <PropertyGroup>
     <JellyfinAbi Condition="'$(JellyfinAbi)' == ''">10.11</JellyfinAbi>
@@ -25,9 +26,14 @@
     <DefineConstants>$(DefineConstants);JF1010</DefineConstants>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(JellyfinAbi)' != '10.10'">
+  <PropertyGroup Condition="'$(JellyfinAbi)' == '10.11'">
     <TargetFramework>net9.0</TargetFramework>
     <JellyfinPackageVersion>10.11.6</JellyfinPackageVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinAbi)' == '12'">
+    <TargetFramework>net10.0</TargetFramework>
+    <JellyfinPackageVersion Condition="'$(JellyfinPackageVersion)' == ''">12.0.0</JellyfinPackageVersion>
   </PropertyGroup>
 
   <ItemGroup>

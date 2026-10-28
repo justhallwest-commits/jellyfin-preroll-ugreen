@@ -1,0 +1,77 @@
+name: Build for Jellyfin 12
+
+# Builds the plugin for Jellyfin 12.x (.NET 10) whenever the code changes, publishes it as a
+# release and adds it to manifest.json. The 10.10 / 10.11 builds are left exactly as they are.
+on:
+  push:
+    branches: [main]
+    paths: ['JellyfinPreroll/**', '.github/workflows/build-jellyfin12.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Work out version
+        id: ver
+        run: |
+          # Same release number as the newest 10.11 build, with 12 as the last number,
+          # so a Jellyfin 12 server always prefers this build.
+          BASE=$(python3 -c "import json; v=[x['version'] for x in json.load(open('manifest.json'))[0]['versions'] if x['targetAbi'].startswith('10.11')]; v.sort(key=lambda s: tuple(int(p) for p in s.split('.'))); print('.'.join(v[-1].split('.')[:3]) if v else '3.0.0')")
+          echo "v=$BASE.12" >> "$GITHUB_OUTPUT"
+          echo "tag=v$BASE-jf12" >> "$GITHUB_OUTPUT"
+          echo "Version $BASE.12"
+
+      - name: Build
+        id: build
+        run: |
+          V=${{ steps.ver.outputs.v }}
+          for JV in 12.0.0 12.0.1 12.1.0 12.2.0 12.3.0 12.4.0; do
+            rm -rf JellyfinPreroll/bin JellyfinPreroll/obj out
+            if dotnet publish JellyfinPreroll -c Release -o out -p:JellyfinAbi=12 -p:JellyfinPackageVersion=$JV -p:Version=$V -p:AssemblyVersion=$V -p:FileVersion=$V; then
+              echo "Built against Jellyfin $JV"; echo "abi=$JV.0" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+          done
+          exit 1
+
+      - name: Package
+        id: pkg
+        run: |
+          V=${{ steps.ver.outputs.v }}
+          ZIP="jellyfin-preroll-v${V}-jf12.zip"
+          (cd out && zip -j "../$ZIP" JellyfinPreroll.dll)
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
+          echo "md5=$(md5sum "$ZIP" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preroll-jellyfin12
+          path: ${{ steps.pkg.outputs.zip }}
+
+      - name: Publish release and manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=${{ steps.ver.outputs.tag }}
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${{ steps.pkg.outputs.zip }}" --clobber
+          else
+            gh release create "$TAG" "${{ steps.pkg.outputs.zip }}" --title "Pre-Roll Videos $TAG (Jellyfin 12)" --notes "Build for Jellyfin 12.x. Install from the plugin repository: https://raw.githubusercontent.com/${{ github.repository }}/main/manifest.json" --target "$GITHUB_SHA"
+          fi
+          URL="https://github.com/${{ github.repository }}/releases/download/$TAG/${{ steps.pkg.outputs.zip }}"
+          git fetch origin main && git checkout -B main origin/main
+          python3 .github/scripts/add_manifest_entry.py "${{ steps.ver.outputs.v }}" "${{ steps.build.outputs.abi }}" "$URL" "${{ steps.pkg.outputs.md5 }}" "Build for Jellyfin 12.x (.NET 10)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "Publish Jellyfin 12 build to manifest [skip ci]" || echo "manifest unchanged"
+          git push origin main
