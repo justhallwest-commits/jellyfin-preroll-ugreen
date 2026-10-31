@@ -84,6 +84,15 @@ public sealed class PrerollSessionWatcher : IHostedService, IDisposable
 		{
 			_logger.LogDebug(ex, "Pre-Roll Videos: similar titles aren't available");
 		}
+		if (Plugin.Instance != null)
+		{
+			Plugin.Instance.ConfigurationChanged += (_, _) => Task.Run(() => SkippableMarker.RunAsync(_services, _libraryManager, _logger));
+		}
+		Task.Run(async () =>
+		{
+			await Task.Delay(TimeSpan.FromSeconds(20)).ConfigureAwait(false);
+			await SkippableMarker.RunAsync(_services, _libraryManager, _logger).ConfigureAwait(false);
+		});
 #endif
 		_sessionManager.PlaybackStart += OnPlaybackStart;
 		_sessionManager.PlaybackStopped += OnPlaybackStopped;

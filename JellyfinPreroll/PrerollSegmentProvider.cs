@@ -70,4 +70,60 @@ public class PrerollSegmentProvider : IMediaSegmentProvider
 
     public Task CleanupExtractedData(Guid itemId, CancellationToken cancellationToken) => Task.CompletedTask;
 }
+
+/// <summary>
+/// Jellyfin's own "Media Segment Scan" only looks at movies, episodes and audio, and pre-roll clips are often
+/// home videos, so the plugin asks for segments on its clips itself: at start-up and whenever settings are saved.
+/// </summary>
+internal static class SkippableMarker
+{
+    private static int _running;
+
+    public static async Task RunAsync(IServiceProvider services, ILibraryManager libraryManager, ILogger logger)
+    {
+        if (Interlocked.Exchange(ref _running, 1) == 1)
+        {
+            return;
+        }
+
+        try
+        {
+            var cfg = Plugin.Instance?.Configuration;
+            if (cfg is null || services.GetService(typeof(IMediaSegmentManager)) is not IMediaSegmentManager segments)
+            {
+                return;
+            }
+
+            var selector = new PrerollSelector(libraryManager, logger);
+            var clips = selector.GetAllClips();
+            var done = 0;
+            foreach (var clip in clips)
+            {
+                if (cfg.SkippablePrerolls)
+                {
+                    await segments.RunSegmentPluginProviders(clip, libraryManager.GetLibraryOptions(clip), false, CancellationToken.None).ConfigureAwait(false);
+                    done++;
+                }
+                else if (segments.HasSegments(clip.Id))
+                {
+                    await segments.DeleteSegmentsAsync(clip.Id, CancellationToken.None).ConfigureAwait(false);
+                    done++;
+                }
+            }
+
+            if (done > 0)
+            {
+                logger.LogInformation("Pre-Roll Videos: {Action} skip segments on {Count} clip(s)", cfg.SkippablePrerolls ? "updated" : "removed", done);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Pre-Roll Videos: couldn't update skip segments");
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _running, 0);
+        }
+    }
+}
 #endif

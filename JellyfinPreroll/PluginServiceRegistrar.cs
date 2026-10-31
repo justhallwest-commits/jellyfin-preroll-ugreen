@@ -13,5 +13,8 @@ public class PluginServiceRegistrar : IPluginServiceRegistrator
 		serviceCollection.AddSingleton<IIntroProvider, PrerollIntroProvider>();
 		serviceCollection.AddSingleton<IStartupFilter, WebPlayerInjection>();
 		serviceCollection.AddHostedService<PrerollSessionWatcher>();
+#if JF12
+		serviceCollection.AddSingleton<MediaBrowser.Controller.MediaSegments.IMediaSegmentProvider, PrerollSegmentProvider>();
+#endif
 	}
 }
