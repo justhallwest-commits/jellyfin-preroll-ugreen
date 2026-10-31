@@ -34,6 +34,7 @@
   <PropertyGroup Condition="'$(JellyfinAbi)' == '12'">
     <TargetFramework>net10.0</TargetFramework>
     <JellyfinPackageVersion Condition="'$(JellyfinPackageVersion)' == ''">12.0.0</JellyfinPackageVersion>
+    <DefineConstants>$(DefineConstants);JF12</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

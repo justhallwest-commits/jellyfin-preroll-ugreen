@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Common.Plugins;
 using MediaBrowser.Controller.Entities;
@@ -41,6 +43,98 @@ public class PrerollSelector
 
 	private readonly ILogger _logger;
 
+#if JF12
+	private static ISimilarItemsManager? _similar;
+
+	/// <summary>Set once at start-up (Jellyfin 12) so every selector can ask for similar titles.</summary>
+	public static void UseSimilarItems(ISimilarItemsManager manager)
+	{
+		_similar = manager;
+	}
+
+	private void AddSimilar(BaseItem item, MediaFacts facts, PluginConfiguration cfg)
+	{
+		try
+		{
+			BaseItem target = item is Episode ep && ep.Series != null ? ep.Series : item;
+			IReadOnlyList<BaseItem> similar = _similar!.GetSimilarItemsAsync(target, Array.Empty<Guid>(), null, new MediaBrowser.Controller.Dto.DtoOptions(false), 8, null, CancellationToken.None)
+				.WaitAsync(TimeSpan.FromSeconds(4)).GetAwaiter().GetResult();
+			foreach (BaseItem s in similar)
+			{
+				MediaFacts f = GetFactsCore(s);
+				IEnumerable<string> values = f.Tags;
+				if (cfg.AutoMatchGenres)
+				{
+					values = values.Concat(f.Genres);
+				}
+				if (cfg.AutoMatchStudios)
+				{
+					values = values.Concat(f.Studios);
+				}
+				foreach (string v in values)
+				{
+					facts.Similar.TryAdd(v, "like " + s.Name);
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			_logger.LogDebug(ex, "Pre-Roll Videos: similar titles lookup failed for {Item}", item.Name);
+		}
+	}
+#endif
+
+	/// <summary>Plays entries from a Jellyfin playlist instead of picking clips. Returns false when no playlist is set.</summary>
+	private bool TryPlaylist(PluginConfiguration cfg, SelectionContext ctx, SelectionResult result)
+	{
+		if (string.IsNullOrWhiteSpace(cfg.PlaylistId) || !Guid.TryParse(cfg.PlaylistId, out Guid playlistId))
+		{
+			return false;
+		}
+		if (_libraryManager.GetItemById(playlistId) is not Folder playlist)
+		{
+			result.Reason = "the pre-roll playlist no longer exists";
+			return true;
+		}
+		HashSet<Guid> disabled = ParseIds(cfg.DisabledClipIds);
+		List<BaseItem> entries = playlist.GetLinkedChildren().Where((BaseItem v) => v is Video && !disabled.Contains(v.Id)).ToList();
+		if (entries.Count == 0)
+		{
+			result.Reason = "the pre-roll playlist \"" + playlist.Name + "\" has no videos";
+			return true;
+		}
+		if (!cfg.PlaylistRotate)
+		{
+			result.Clips = entries;
+			result.Reason = "playlist \"" + playlist.Name + "\" (all " + entries.Count + ")";
+			return true;
+		}
+		int count = Math.Clamp(cfg.PrerollCount, 1, 5);
+		string key = "playlist:" + playlistId.ToString("N");
+		List<BaseItem> chosen = new List<BaseItem>();
+		lock (_stateLock)
+		{
+			_sequentialIndex.TryGetValue(key, out int start);
+			for (int i = 0; i < Math.Min(count, entries.Count); i++)
+			{
+				chosen.Add(entries[(start + i) % entries.Count]);
+			}
+			if (!ctx.DryRun)
+			{
+				_sequentialIndex[key] = (start + chosen.Count) % entries.Count;
+			}
+		}
+		result.Clips = chosen;
+		result.Reason = "playlist \"" + playlist.Name + "\" (next " + chosen.Count + " of " + entries.Count + ")";
+		return true;
+	}
+
+	private void LogPick(BaseItem item, string trigger, bool quiet, SelectionContext ctx, SelectionResult result)
+	{
+		LogLevel level = (quiet || ctx.DryRun) ? LogLevel.Debug : LogLevel.Information;
+		_logger.Log(level, "Pre-Roll Videos ({Trigger}): {Count} pre-roll(s) before \"{Item}\" [{Reason}]", trigger, result.Clips.Count, item.Name, result.Reason);
+	}
+
 	public PrerollSelector(ILibraryManager libraryManager, ILogger logger)
 	{
 		_libraryManager = libraryManager;
@@ -58,11 +152,35 @@ public class PrerollSelector
 	public bool IsPrerollClip(BaseItem? item)
 	{
 		PluginConfiguration pluginConfiguration = ((BasePlugin<PluginConfiguration>)(object)Plugin.Instance)?.Configuration;
-		if (item == null || pluginConfiguration == null || !TryGetLibraryId(pluginConfiguration, out var id))
+		if (item == null || pluginConfiguration == null)
+		{
+			return false;
+		}
+		if (InPlaylist(pluginConfiguration, item))
+		{
+			return true;
+		}
+		if (!TryGetLibraryId(pluginConfiguration, out var id))
 		{
 			return false;
 		}
 		return GetLibraryIds(item).Contains(id);
+	}
+
+	private bool InPlaylist(PluginConfiguration cfg, BaseItem item)
+	{
+		if (string.IsNullOrWhiteSpace(cfg.PlaylistId) || !Guid.TryParse(cfg.PlaylistId, out Guid playlistId))
+		{
+			return false;
+		}
+		try
+		{
+			return _libraryManager.GetItemById(playlistId) is Folder playlist && playlist.GetLinkedChildren().Any((BaseItem c) => c.Id == item.Id);
+		}
+		catch
+		{
+			return false;
+		}
 	}
 
 	public HashSet<Guid> GetPrerollClipIds()
@@ -204,7 +322,8 @@ public class PrerollSelector
 		{
 			return selectionResult;
 		}
-		if (!TryGetLibraryId(pluginConfiguration, out var id))
+		bool usingPlaylist = !string.IsNullOrWhiteSpace(pluginConfiguration.PlaylistId);
+		if (!TryGetLibraryId(pluginConfiguration, out var id) && !usingPlaylist)
 		{
 			selectionResult.Reason = "no pre-roll library selected";
 			return selectionResult;
@@ -230,7 +349,7 @@ public class PrerollSelector
 			return selectionResult;
 		}
 		HashSet<Guid> libraryIds = GetLibraryIds(item);
-		if (libraryIds.Contains(id))
+		if ((id != Guid.Empty && libraryIds.Contains(id)) || InPlaylist(pluginConfiguration, item))
 		{
 			selectionResult.Reason = "item is a pre-roll clip";
 			return selectionResult;
@@ -261,6 +380,16 @@ public class PrerollSelector
 					return selectionResult;
 				}
 			}
+		}
+		if (TryPlaylist(pluginConfiguration, ctx, selectionResult))
+		{
+			LogPick(item, trigger, quiet, ctx, selectionResult);
+			return selectionResult;
+		}
+		if (id == Guid.Empty)
+		{
+			selectionResult.Reason = "no pre-roll library selected";
+			return selectionResult;
 		}
 		HashSet<Guid> disabled = ParseIds(pluginConfiguration.DisabledClipIds);
 		long maxTicks = ((pluginConfiguration.MaxDurationSeconds > 0) ? TimeSpan.FromSeconds(pluginConfiguration.MaxDurationSeconds).Ticks : long.MaxValue);
@@ -440,6 +569,16 @@ public class PrerollSelector
 			}
 			return list8;
 		}
+		if (config.SimilarFallback && env.Facts.Similar.Count > 0)
+		{
+			List<BaseItem> similarClips = pool.Where((BaseItem c) => ClipTags(c).Overlaps(env.Facts.Similar.Keys)).ToList();
+			if (similarClips.Count > 0)
+			{
+				List<string> used = similarClips.SelectMany(ClipTags).Where(env.Facts.Similar.ContainsKey).Distinct(Ci).OrderBy((string t) => t, Ci).ToList();
+				reason = "no direct match; like " + string.Join(", ", used.Select((string t) => t + " (" + env.Facts.Similar[t] + ")"));
+				return Pick(similarClips, count, "similar:" + string.Join("|", used), config.Order, dryRun);
+			}
+		}
 		switch (config.WhenNoMatch)
 		{
 		case NoMatchBehavior.PlayNothing:
@@ -452,16 +591,40 @@ public class PrerollSelector
 			reason = ((list5.Count > 0) ? ("no match, " + text) : "no match and no untagged (general) clips");
 			return Pick(list5, count, "general:" + text, config.Order, dryRun);
 		}
-		void Want(IEnumerable<string> values, string value)
+		void Want(IEnumerable<string> values, string kind)
 		{
-			foreach (string value in values)
+			foreach (string v in values)
 			{
-				wanted.TryAdd(value, value);
+				wanted.TryAdd(v, kind);
 			}
 		}
 	}
 
 	private MediaFacts GetFacts(BaseItem item)
+	{
+		PluginConfiguration? cfg = Plugin.Instance?.Configuration;
+#if JF12
+		// Jellyfin 12: a 4K / alternate version is its own item; use the main version's tags and genres.
+		if (cfg != null && cfg.SameForAllVersions && item is Video video && video.PrimaryVersionId.HasValue)
+		{
+			BaseItem? primary = _libraryManager.GetItemById(video.PrimaryVersionId.Value);
+			if (primary != null)
+			{
+				item = primary;
+			}
+		}
+#endif
+		MediaFacts mediaFacts = GetFactsCore(item);
+#if JF12
+		if (cfg != null && cfg.SimilarFallback && _similar != null)
+		{
+			AddSimilar(item, mediaFacts, cfg);
+		}
+#endif
+		return mediaFacts;
+	}
+
+	private MediaFacts GetFactsCore(BaseItem item)
 	{
 		MediaFacts mediaFacts = new MediaFacts();
 		try

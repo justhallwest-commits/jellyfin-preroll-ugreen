@@ -19,6 +19,9 @@ public sealed class MediaFacts
 
 	public HashSet<string> Types { get; } = NewSet();
 
+	/// <summary>Tags / genres of similar titles (value: which title it came from). Jellyfin 12.</summary>
+	public Dictionary<string, string> Similar { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
 	public HashSet<string> For(MatchField field)
 	{
 		return field switch

@@ -54,4 +54,24 @@ public class PluginConfiguration : BasePluginConfiguration
 	public string TimeZoneId { get; set; } = string.Empty;
 
 	public SequenceSlot[] Sequence { get; set; } = Array.Empty<SequenceSlot>();
+
+	// ---- Jellyfin 12 options
+
+	/// <summary>When nothing matches, look at titles Jellyfin finds similar and use their tags/genres (Jellyfin 12).</summary>
+	public bool SimilarFallback { get; set; }
+
+	/// <summary>Alternate versions (1080p / 4K) use the main version's tags, so every version gets the same pre-roll (Jellyfin 12).</summary>
+	public bool SameForAllVersions { get; set; } = true;
+
+	/// <summary>Mark pre-roll clips as skippable segments so apps can show a Skip button (Jellyfin 12).</summary>
+	public bool SkippablePrerolls { get; set; }
+
+	/// <summary>Segment type used for skippable pre-rolls: Intro, Commercial or Preview.</summary>
+	public string SkippableType { get; set; } = "Intro";
+
+	/// <summary>A Jellyfin playlist to use as the pre-roll line-up instead of picking clips.</summary>
+	public string PlaylistId { get; set; } = string.Empty;
+
+	/// <summary>True: play the next "Clips per play" entries each time, rotating through the playlist. False: play the whole playlist.</summary>
+	public bool PlaylistRotate { get; set; } = true;
 }

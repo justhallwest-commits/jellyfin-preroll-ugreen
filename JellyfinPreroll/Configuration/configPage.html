@@ -95,6 +95,7 @@
                     <button type="button" class="prTab" data-tab="matching">Matching</button>
                     <button type="button" class="prTab" data-tab="schedules">Schedules</button>
                     <button type="button" class="prTab" data-tab="clips">Clips</button>
+                    <button type="button" class="prTab" data-tab="jf12">Jellyfin 12</button>
                     <button type="button" class="prTab" data-tab="test">Test</button>
                     <button type="button" class="prTab" data-tab="activity">Activity</button>
                 </nav>
@@ -320,6 +321,49 @@
                 </section>
 
                 <!-- ═════════════ TEST ═════════════ -->
+                <section class="prPanel" data-panel="jf12">
+                    <p class="prMuted">Extra options that use features new in Jellyfin 12. The playlist option also works on older Jellyfin.</p>
+
+                    <h3 class="sectionTitle">Smarter matching</h3>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" id="chkSimilar" /><span>When nothing matches, use titles Jellyfin finds similar</span></label>
+                        <div class="fieldDescription checkboxFieldDescription">If a movie or show has no clip for its own tags or genres, look at its "More like this" titles and use a clip that matches them instead — before falling back to "When nothing matches".</div>
+                    </div>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" id="chkSameVersions" checked /><span>Same pre-roll for every version of a title</span></label>
+                        <div class="fieldDescription checkboxFieldDescription">Jellyfin 12 keeps 1080p and 4K copies (and episode versions) as separate versions of one title. With this on, every version uses the main version's tags and genres, so they all get the same pre-roll rules.</div>
+                    </div>
+
+                    <h3 class="sectionTitle">Skip button</h3>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" id="chkSkippable" /><span>Let viewers skip pre-rolls</span></label>
+                        <div class="fieldDescription checkboxFieldDescription">Marks each clip as a media segment, so apps that support segments show a Skip button while it plays. After saving, run Dashboard → Scheduled Tasks → <b>Media Segment Scan</b> (or scan the pre-roll library). Make sure "Pre-Roll Videos" is ticked under the pre-roll library's <i>Media segment providers</i>.</div>
+                    </div>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="selectSkipType">Show the clip to apps as</label>
+                        <select is="emby-select" id="selectSkipType" class="emby-select-withcolor">
+                            <option value="Intro">Intro (most apps offer Skip Intro)</option>
+                            <option value="Commercial">Commercial</option>
+                            <option value="Preview">Preview</option>
+                        </select>
+                        <div class="fieldDescription">Each viewer chooses what happens for each type under Settings → Playback → Media segments (ask to skip, skip automatically, or play).</div>
+                    </div>
+
+                    <h3 class="sectionTitle">Play a playlist</h3>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="selectPlaylist">Pre-roll playlist</label>
+                        <select is="emby-select" id="selectPlaylist" class="emby-select-withcolor"><option value="">— Off (pick clips as usual) —</option></select>
+                        <div class="fieldDescription">Use a Jellyfin playlist as your line-up instead: build it like any playlist (Add to playlist on each clip) and drag entries into order. Skip-user, library, cooldown and disabled-clip settings still apply; tags, schedules and the sequence are not used while a playlist is set.</div>
+                    </div>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="selectPlaylistMode">Each time</label>
+                        <select is="emby-select" id="selectPlaylistMode" class="emby-select-withcolor">
+                            <option value="rotate">Play the next "Clips per play" entries, then continue from there next time</option>
+                            <option value="all">Play the whole playlist</option>
+                        </select>
+                    </div>
+                </section>
+
                 <section class="prPanel" data-panel="test">
                     <div class="prHelp">Find any movie or episode to see exactly which pre-roll would play and why. Uses your <b>saved</b> settings and changes nothing.</div>
                     <div class="prRow">
@@ -509,6 +553,22 @@
                     $('#chkEnableMovies').checked = config.EnableForMovies !== false;
                     $('#chkAutoplay').checked = config.PlayBeforeAutoplay !== false;
                     $('#chkWebPlayer').checked = config.EnableWebPlayerIntegration !== false;
+                    $('#chkSimilar').checked = !!config.SimilarFallback;
+                    $('#chkSameVersions').checked = config.SameForAllVersions !== false;
+                    $('#chkSkippable').checked = !!config.SkippablePrerolls;
+                    $('#selectSkipType').value = config.SkippableType || 'Intro';
+                    $('#selectPlaylistMode').value = config.PlaylistRotate === false ? 'all' : 'rotate';
+                    (function (wanted) {
+                        ApiClient.getItems(ApiClient.getCurrentUserId(), { IncludeItemTypes: 'Playlist', Recursive: true, SortBy: 'SortName', EnableImages: false }).then(function (r) {
+                            var sel = $('#selectPlaylist');
+                            sel.innerHTML = '<option value="">— Off (pick clips as usual) —</option>';
+                            (r.Items || []).forEach(function (p) {
+                                var o = document.createElement('option'); o.value = p.Id; o.textContent = p.Name;
+                                if (norm(p.Id) === norm(wanted)) { o.selected = true; }
+                                sel.appendChild(o);
+                            });
+                        }).catch(function () { /* no playlists */ });
+                    })(config.PlaylistId || '');
 
                     var cd = String(config.CooldownMinutes || 0);
                     var cdSel = $('#selectCooldown');
@@ -786,6 +846,12 @@
                     config.EnableForMovies = $('#chkEnableMovies').checked;
                     config.PlayBeforeAutoplay = $('#chkAutoplay').checked;
                     config.EnableWebPlayerIntegration = $('#chkWebPlayer').checked;
+                    config.SimilarFallback = $('#chkSimilar').checked;
+                    config.SameForAllVersions = $('#chkSameVersions').checked;
+                    config.SkippablePrerolls = $('#chkSkippable').checked;
+                    config.SkippableType = $('#selectSkipType').value;
+                    config.PlaylistId = $('#selectPlaylist').value;
+                    config.PlaylistRotate = $('#selectPlaylistMode').value !== 'all';
                     config.CooldownMinutes = parseInt($('#selectCooldown').value, 10) || 0;
                     config.SkipUserIds = $all('#skipUserList .chkSkipUser').filter(function (c) { return c.checked; }).map(function (c) { return c.getAttribute('data-id'); });
                     config.ExcludedLibraryIds = $all('#excludeList .chkExclude')

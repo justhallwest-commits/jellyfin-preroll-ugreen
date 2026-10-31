@@ -59,8 +59,11 @@ public sealed class PrerollSessionWatcher : IHostedService, IDisposable
 
 	internal static Func<DateTime> UtcNow { get; set; } = () => DateTime.UtcNow;
 
-	public PrerollSessionWatcher(ISessionManager sessionManager, ILibraryManager libraryManager, ILogger<PrerollSessionWatcher> logger)
+	private readonly IServiceProvider _services;
+
+	public PrerollSessionWatcher(ISessionManager sessionManager, ILibraryManager libraryManager, ILogger<PrerollSessionWatcher> logger, IServiceProvider services)
 	{
+		_services = services;
 		_sessionManager = sessionManager;
 		_libraryManager = libraryManager;
 		_logger = logger;
@@ -69,6 +72,19 @@ public sealed class PrerollSessionWatcher : IHostedService, IDisposable
 
 	public Task StartAsync(CancellationToken cancellationToken)
 	{
+#if JF12
+		try
+		{
+			if (_services.GetService(typeof(ISimilarItemsManager)) is ISimilarItemsManager similar)
+			{
+				PrerollSelector.UseSimilarItems(similar);
+			}
+		}
+		catch (Exception ex)
+		{
+			_logger.LogDebug(ex, "Pre-Roll Videos: similar titles aren't available");
+		}
+#endif
 		_sessionManager.PlaybackStart += OnPlaybackStart;
 		_sessionManager.PlaybackStopped += OnPlaybackStopped;
 		_logger.LogInformation("Pre-Roll Videos: autoplay watcher started");
