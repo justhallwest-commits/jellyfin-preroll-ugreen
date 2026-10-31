@@ -1,0 +1,69 @@
+name: Build & release
+
+# Builds Pre-Roll Videos for Jellyfin 10.10, 10.11 and 12 from the source in this repository and
+# publishes all three to manifest.json. Run it from the Actions tab with a version (e.g. 3.1.0).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 3.1.0'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Versions
+        id: v
+        run: |
+          IFS='.' read -r a b c _ <<< "${{ github.event.inputs.version }}"
+          a=${a:-3}; b=${b:-0}; c=${c:-0}
+          echo "tag=v$a.$b.$c" >> "$GITHUB_OUTPUT"
+          echo "v1011=$a.$b.$c.0" >> "$GITHUB_OUTPUT"
+          echo "v12=$a.$b.$c.12" >> "$GITHUB_OUTPUT"
+          # 10.10 builds keep their own lower numbers (3.0 -> 1.30, 3.1 -> 1.31) so 10.11+ servers never pick them
+          echo "v1010=1.$((a * 10 + b)).$c.0" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: |
+          set -e
+          build() { rm -rf JellyfinPreroll/bin JellyfinPreroll/obj; dotnet publish JellyfinPreroll -c Release -o "out/$1" "${@:2}"; }
+          build 1010 -p:JellyfinAbi=10.10 -p:Version=${{ steps.v.outputs.v1010 }} -p:AssemblyVersion=${{ steps.v.outputs.v1010 }} -p:FileVersion=${{ steps.v.outputs.v1010 }}
+          build 1011 -p:JellyfinAbi=10.11 -p:Version=${{ steps.v.outputs.v1011 }} -p:AssemblyVersion=${{ steps.v.outputs.v1011 }} -p:FileVersion=${{ steps.v.outputs.v1011 }}
+          build 12 -p:JellyfinAbi=12 -p:JellyfinPackageVersion=12.0.0 -p:Version=${{ steps.v.outputs.v12 }} -p:AssemblyVersion=${{ steps.v.outputs.v12 }} -p:FileVersion=${{ steps.v.outputs.v12 }}
+          T=${{ steps.v.outputs.tag }}
+          (cd out/1010 && zip -j "../../jellyfin-preroll-$T-jf10.10.zip" JellyfinPreroll.dll)
+          (cd out/1011 && zip -j "../../jellyfin-preroll-$T.zip" JellyfinPreroll.dll)
+          (cd out/12 && zip -j "../../jellyfin-preroll-$T-jf12.zip" JellyfinPreroll.dll)
+
+      - name: Publish release and manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          T=${{ steps.v.outputs.tag }}
+          Z="jellyfin-preroll-$T-jf10.10.zip jellyfin-preroll-$T.zip jellyfin-preroll-$T-jf12.zip"
+          gh release create "$T" $Z --title "Pre-Roll Videos $T" --notes "Builds for Jellyfin 10.10, 10.11 and 12. Install from the plugin repository: https://raw.githubusercontent.com/${{ github.repository }}/main/manifest.json" --target "$GITHUB_SHA" \
+            || gh release upload "$T" $Z --clobber
+          U="https://github.com/${{ github.repository }}/releases/download/$T"
+          git fetch origin main && git checkout -B main origin/main
+          md() { md5sum "$1" | cut -d' ' -f1; }
+          python3 .github/scripts/add_manifest_entry.py "${{ steps.v.outputs.v1010 }}" 10.10.0.0 "$U/jellyfin-preroll-$T-jf10.10.zip" "$(md jellyfin-preroll-$T-jf10.10.zip)" "$T for Jellyfin 10.10"
+          python3 .github/scripts/add_manifest_entry.py "${{ steps.v.outputs.v1011 }}" 10.11.0.0 "$U/jellyfin-preroll-$T.zip" "$(md jellyfin-preroll-$T.zip)" "$T for Jellyfin 10.11"
+          python3 .github/scripts/add_manifest_entry.py "${{ steps.v.outputs.v12 }}" 12.0.0.0 "$U/jellyfin-preroll-$T-jf12.zip" "$(md jellyfin-preroll-$T-jf12.zip)" "$T for Jellyfin 12: similar-title fallback, same pre-roll for every version, skippable pre-rolls, playlist line-up"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "Publish $T to manifest [skip ci]" || echo "manifest unchanged"
+          git push origin main
