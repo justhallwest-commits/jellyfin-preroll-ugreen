@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pre-Roll Videos</title>
+</head>
+<body>
+    <!--
+      IMPORTANT: Jellyfin only keeps the <div data-role="page"> element of a plugin page.
+      The <style> and <script> must stay INSIDE this div or they are thrown away.
+    -->
+    <div id="prerollConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
+         data-require="emby-select,emby-input,emby-checkbox,emby-button">
+
+        <style>
+            #prerollConfigPage { --pr-ok:#4caf50; --pr-warn:#ff9800; --pr-bad:#f44336; --pr-accent:#00a4dc; --pr-line:rgba(128,128,128,.22); --pr-soft:rgba(128,128,128,.08); }
+            #prerollConfigPage .prHead { display:flex; align-items:baseline; gap:.8em; flex-wrap:wrap; }
+            #prerollConfigPage .prVersion { opacity:.55; font-size:.9em; }
+            #prerollConfigPage .prTabs { display:flex; gap:.2em; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; margin:1em 0 1.4em; border-bottom:1px solid var(--pr-line); }
+            #prerollConfigPage .prTabs::-webkit-scrollbar { display:none; }
+            #prerollConfigPage .prTab { white-space:nowrap; flex:none; background:none; border:0; color:inherit; font:inherit; padding:.7em 1em; cursor:pointer; opacity:.7; border-bottom:3px solid transparent; margin-bottom:-1px; }
+            #prerollConfigPage .prTab:hover { opacity:1; }
+            #prerollConfigPage .prTab.active { opacity:1; border-bottom-color:var(--pr-accent); font-weight:600; }
+            #prerollConfigPage .prPanel { display:none; }
+            #prerollConfigPage .prPanel.active { display:block; }
+            #prerollConfigPage .prBox { padding:1em 1.2em; border-radius:.4em; background:var(--pr-soft); margin-bottom:1.2em; }
+            #prerollConfigPage .prGrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(12em,1fr)); gap:1em; margin-bottom:1.4em; }
+            #prerollConfigPage .prCard { padding:1em 1.1em; border-radius:.4em; background:var(--pr-soft); }
+            #prerollConfigPage .prCard h4 { margin:0 0 .5em; font-size:.85em; text-transform:uppercase; letter-spacing:.05em; opacity:.65; font-weight:600; }
+            #prerollConfigPage .prBig { font-size:1.5em; font-weight:600; }
+            #prerollConfigPage .prMuted { opacity:.65; font-size:.9em; }
+            #prerollConfigPage .prCheck { display:flex; gap:.7em; padding:.6em 0; border-bottom:1px solid var(--pr-line); align-items:flex-start; }
+            #prerollConfigPage .prCheck:last-child { border-bottom:0; }
+            #prerollConfigPage .prIcon { width:1.4em; text-align:center; flex:none; font-weight:700; }
+            #prerollConfigPage .ok { color:var(--pr-ok); } #prerollConfigPage .warn { color:var(--pr-warn); } #prerollConfigPage .bad { color:var(--pr-bad); }
+            #prerollConfigPage .prRow { display:flex; gap:.5em; align-items:center; flex-wrap:wrap; margin-bottom:.55em; }
+            #prerollConfigPage .prRow > * { min-width:0; }
+            #prerollConfigPage .prIn, #prerollConfigPage .prSel { padding:.5em .65em; border-radius:.25em; border:1px solid rgba(128,128,128,.4); background:rgba(0,0,0,.18); color:inherit; font:inherit; }
+            #prerollConfigPage .prSel option { color:#000; }
+            #prerollConfigPage .prIn.grow { flex:1 1 10em; }
+            #prerollConfigPage .prBtn { padding:.45em .9em; border-radius:.25em; border:1px solid rgba(128,128,128,.45); background:rgba(128,128,128,.14); color:inherit; font:inherit; cursor:pointer; }
+            #prerollConfigPage .prBtn:hover { background:rgba(128,128,128,.26); }
+            #prerollConfigPage .prBtn.primary { background:var(--pr-accent); border-color:var(--pr-accent); color:#fff; }
+            #prerollConfigPage .prBtn.small { padding:.25em .6em; font-size:.88em; }
+            #prerollConfigPage .prBtn[disabled] { opacity:.45; cursor:default; }
+            #prerollConfigPage .prChip { display:inline-flex; align-items:center; gap:.35em; padding:.15em .6em; margin:.12em .25em .12em 0; border-radius:1em; background:rgba(0,164,220,.18); font-size:.88em; }
+            #prerollConfigPage .prChip button { background:none; border:0; color:inherit; cursor:pointer; padding:0; opacity:.6; font-size:1em; line-height:1; }
+            #prerollConfigPage .prChip button:hover { opacity:1; }
+            #prerollConfigPage .prBadge { display:inline-block; padding:.1em .5em; border-radius:.3em; font-size:.78em; margin-right:.3em; background:rgba(128,128,128,.25); }
+            #prerollConfigPage .prBadge.warn { background:rgba(255,152,0,.2); color:var(--pr-warn); }
+            #prerollConfigPage .prBadge.ok { background:rgba(76,175,80,.2); color:var(--pr-ok); }
+            #prerollConfigPage .prClip { display:flex; gap:.9em; padding:.8em 0; border-bottom:1px solid var(--pr-line); align-items:flex-start; }
+            #prerollConfigPage .prThumb { position:relative; width:6.5em; height:3.65em; border-radius:.25em; background:rgba(128,128,128,.2); flex:none; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:1.3em; opacity:.9; }
+            #prerollConfigPage .prThumb img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+            #prerollConfigPage .prLbl { min-width:4.8em; opacity:.65; }
+            #prerollConfigPage .prClipMain { flex:1; min-width:0; }
+            #prerollConfigPage .prClipName { font-weight:600; word-break:break-word; }
+            #prerollConfigPage .prClip.off .prClipMain, #prerollConfigPage .prClip.off .prThumb { opacity:.45; }
+            #prerollConfigPage .prTagAdd { width:7.5em; padding:.2em .5em; font-size:.88em; }
+            #prerollConfigPage .prSchedule { padding:1em 1.1em; border-radius:.4em; background:var(--pr-soft); margin-bottom:1em; }
+            #prerollConfigPage .prDays label { display:inline-flex; align-items:center; gap:.2em; margin-right:.55em; cursor:pointer; }
+            #prerollConfigPage .prPresets { display:flex; flex-wrap:wrap; gap:.45em; margin:.6em 0 1.4em; }
+            #prerollConfigPage .prSaveBar { position:sticky; bottom:0; z-index:5; display:flex; gap:1em; align-items:center; padding:.8em 0; margin-top:1.5em; background:var(--pr-bg, rgba(16,16,16,.92)); backdrop-filter:blur(6px); border-top:1px solid var(--pr-line); }
+            #prerollConfigPage .prSaveBar .button-submit { margin:0; max-width:16em; }
+            #prerollConfigPage .prDirty { color:var(--pr-warn); display:none; }
+            #prerollConfigPage .prDirty.show { display:inline; }
+            #prerollConfigPage .prAct { padding:.55em 0; border-bottom:1px solid var(--pr-line); font-size:.92em; line-height:1.4; }
+            #prerollConfigPage .prAct:last-child { border-bottom:0; }
+            #prerollConfigPage .prActMeta { opacity:.65; font-size:.88em; }
+            #prerollConfigPage .prAct.ok .prActMsg { color:var(--pr-ok); }
+            #prerollConfigPage .prAct.warn .prActMsg { color:var(--pr-warn); }
+            #prerollConfigPage .prResult { display:flex; gap:.6em; padding:.45em 0; cursor:pointer; align-items:center; border-bottom:1px solid var(--pr-line); }
+            #prerollConfigPage .prResult:hover { background:var(--pr-soft); }
+            #prerollConfigPage .prFacts td { padding:.25em .9em .25em 0; vertical-align:top; }
+            #prerollConfigPage .prFacts td:first-child { opacity:.65; white-space:nowrap; }
+            #prerollConfigPage .prFolder { padding:.4em .5em; cursor:pointer; border-radius:.2em; }
+            #prerollConfigPage .prFolder:hover { background:var(--pr-soft); }
+            #prerollConfigPage .prHelp { font-size:.92em; opacity:.75; margin:.2em 0 1em; line-height:1.5; }
+            #prerollConfigPage h3.sectionTitle { margin-top:1.8em; }
+            #prerollConfigPage .prList { max-height:16em; overflow:auto; }
+        </style>
+
+        <div data-role="content">
+            <div class="content-primary">
+
+                <div class="prHead">
+                    <h2 class="sectionTitle" style="margin:0;">Pre-Roll Videos</h2>
+                    <span class="prVersion" id="prVersion"></span>
+                </div>
+
+                <div id="prerollMsg" style="color: var(--pr-warn); margin: .8em 0 0; display: none;"></div>
+
+                <nav class="prTabs" id="prTabs">
+                    <button type="button" class="prTab active" data-tab="overview">Overview</button>
+                    <button type="button" class="prTab" data-tab="general">General</button>
+                    <button type="button" class="prTab" data-tab="matching">Matching</button>
+                    <button type="button" class="prTab" data-tab="schedules">Schedules</button>
+                    <button type="button" class="prTab" data-tab="clips">Clips</button>
+                    <button type="button" class="prTab" data-tab="test">Test</button>
+                    <button type="button" class="prTab" data-tab="activity">Activity</button>
+                </nav>
+
+                <form id="prerollConfigForm">
+
+                    <!-- ═════════════ OVERVIEW ═════════════ -->
+                    <section class="prPanel active" data-panel="overview">
+                        <div class="prGrid" id="ovCards"></div>
+
+                        <h3 class="sectionTitle" style="margin-top:0;">Health check</h3>
+                        <div class="prBox" id="ovChecks"><div class="prMuted">Checking…</div></div>
+
+                        <div id="ovSetup" style="display:none;">
+                            <h3 class="sectionTitle">Create a pre-roll library</h3>
+                            <div class="prHelp">
+                                Put your pre-roll clips (MP4 works best) in a folder on the NAS first, e.g. a <b>Prerolls</b> folder inside a
+                                shared folder Jellyfin can see. Then pick that folder here.
+                            </div>
+                            <div class="prBox">
+                                <div class="prRow">
+                                    <input class="prIn" id="newLibName" value="Prerolls" placeholder="Library name" style="width:12em;" />
+                                    <input class="prIn grow" id="newLibPath" placeholder="Folder, e.g. /media/Prerolls" />
+                                    <button type="button" class="prBtn" id="btnBrowse">Browse…</button>
+                                    <button type="button" class="prBtn primary" id="btnCreateLib">Create library</button>
+                                </div>
+                                <div id="folderBrowser" style="display:none; margin-top:.8em;">
+                                    <div class="prRow"><button type="button" class="prBtn small" id="btnFolderUp">⬆ Up</button><span id="folderPath" class="prMuted"></span></div>
+                                    <div id="folderList" class="prList"></div>
+                                </div>
+                                <div id="createLibMsg" class="prMuted" style="margin-top:.6em;"></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- ═════════════ GENERAL ═════════════ -->
+                    <section class="prPanel" data-panel="general">
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="selectPrerollLibrary">Pre-roll library</label>
+                            <select is="emby-select" id="selectPrerollLibrary" class="emby-select-withcolor">
+                                <option value="">Loading libraries…</option>
+                            </select>
+                            <div class="fieldDescription">The library that holds your pre-roll clips. No library yet? Create one on the Overview tab.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="inputPrerollCount">Clips per play</label>
+                            <input is="emby-input" type="number" id="inputPrerollCount" min="1" max="5" step="1" value="1" />
+                            <div class="fieldDescription">How many pre-rolls to play before each item (1–5). Ignored when you build a sequence on the Matching tab.</div>
+                        </div>
+
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="selectOrder">Order</label>
+                            <select is="emby-select" id="selectOrder" class="emby-select-withcolor">
+                                <option value="Shuffle">Shuffle (avoids repeating the last clip)</option>
+                                <option value="Sequential">Sequential (rotate A→Z)</option>
+                            </select>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="inputMaxDuration">Max clip length (seconds)</label>
+                            <input is="emby-input" type="number" id="inputMaxDuration" min="0" step="1" value="0" />
+                            <div class="fieldDescription">Clips longer than this are skipped. 0 = no limit.</div>
+                        </div>
+
+                        <div class="checkboxContainer">
+                            <label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" id="chkEnableMovies" checked /><span>Play before movies</span></label>
+                        </div>
+                        <div class="checkboxContainer">
+                            <label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" id="chkEnableTvShows" checked /><span>Play before TV episodes</span></label>
+                        </div>
+
+                        <h3 class="sectionTitle">How often</h3>
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="selectCooldown">Play a pre-roll</label>
+                            <select is="emby-select" id="selectCooldown" class="emby-select-withcolor">
+                                <option value="0">Before every movie and episode</option>
+                                <option value="15">At most once every 15 minutes (per viewer)</option>
+                                <option value="30">At most once every 30 minutes</option>
+                                <option value="60">At most once an hour</option>
+                                <option value="120">At most once every 2 hours</option>
+                                <option value="240">At most once every 4 hours</option>
+                                <option value="480">At most once every 8 hours</option>
+                                <option value="1440">At most once a day</option>
+                            </select>
+                            <div class="fieldDescription">Great for binge-watching: e.g. "once an hour" plays a pre-roll before the first episode, then again after an hour.</div>
+                        </div>
+
+                        <h3 class="sectionTitle">How pre-rolls reach your devices</h3>
+                        <div class="checkboxContainer">
+                            <label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" id="chkWebPlayer" checked /><span>Web player integration (recommended)</span></label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Browsers, Jellyfin Media Player, the Android phone app and WebView TV apps queue a pre-roll before every
+                                movie and episode, including autoplay. Reload open Jellyfin tabs and apps after changing this.
+                            </div>
+                        </div>
+                        <div class="checkboxContainer">
+                            <label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" id="chkAutoplay" checked /><span>Server fallback for other apps</span></label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                For apps without the web player (e.g. native TV apps): if something starts without a pre-roll, the server tells
+                                the app to play one first. Only for apps that accept remote control; there may be a split-second flash.
+                            </div>
+                        </div>
+
+                        <h3 class="sectionTitle">Who gets pre-rolls</h3>
+                        <div class="prHelp">Checked users <b>never</b> see pre-rolls (e.g. kids' profiles, or yourself while testing).</div>
+                        <div id="skipUserList" class="prBox"><span class="prMuted">Loading users…</span></div>
+
+                        <h3 class="sectionTitle">Skip these libraries</h3>
+                        <div class="prHelp">Movies and episodes in checked libraries never get pre-rolls.</div>
+                        <div id="excludeList" class="prBox"></div>
+
+                        <h3 class="sectionTitle">Backup</h3>
+                        <div class="prHelp">Save all settings to a file, or load them on another server. Libraries are matched by name.</div>
+                        <div class="prRow">
+                            <button type="button" class="prBtn" id="btnExport">⬇ Export settings</button>
+                            <button type="button" class="prBtn" id="btnImport">⬆ Import settings…</button>
+                            <input type="file" id="fileImport" accept=".json,application/json" style="display:none;" />
+                            <span id="backupMsg" class="prMuted"></span>
+                        </div>
+                    </section>
+
+                    <!-- ═════════════ MATCHING ═════════════ -->
+                    <section class="prPanel" data-panel="matching">
+                        <div class="prBox prHelp" style="margin-top:0;">
+                            Give your pre-roll clips <b>tags</b> (Clips tab). A clip tagged <i>Horror</i> plays before horror movies and shows,
+                            automatically, using the genres Jellyfin already downloaded. Clips with <b>no tags</b> are your general pre-rolls.
+                        </div>
+
+                        <div class="checkboxContainer">
+                            <label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" id="chkTagMatching" checked /><span>Turn on matching</span></label>
+                            <div class="fieldDescription checkboxFieldDescription">Off = any clip can play before anything.</div>
+                        </div>
+
+                        <div id="tagOptions">
+                            <h3 class="sectionTitle">Match clip tags automatically against the item's…</h3>
+                            <div class="checkboxContainer"><label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" id="chkAutoMatch" checked /><span>Tags</span></label></div>
+                            <div class="checkboxContainer"><label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" id="chkAutoGenres" checked /><span>Genres (Horror, Comedy, Animation…)</span></label></div>
+                            <div class="checkboxContainer"><label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" id="chkAutoStudios" /><span>Studios / networks (HBO, Pixar, Netflix…)</span></label></div>
+                            <div class="checkboxContainer"><label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" id="chkAutoRatings" /><span>Content rating (PG, R, TV-MA…)</span></label></div>
+
+                            <h3 class="sectionTitle">Rules</h3>
+                            <div class="prHelp">For anything else, e.g. <i>Library = Kids Movies → KidsIntro</i>, <i>Title = The Office → DunderMifflin</i>, or <i>Type = Movie → MovieBumper</i>.</div>
+                            <div id="ruleList"></div>
+                            <button type="button" id="btnAddRule" class="prBtn">+ Add rule</button>
+
+                            <h3 class="sectionTitle">When nothing matches</h3>
+                            <div class="selectContainer">
+                                <select is="emby-select" id="selectNoMatch" class="emby-select-withcolor">
+                                    <option value="PlayGeneral">Play a general (untagged) clip</option>
+                                    <option value="PlayAny">Play any clip</option>
+                                    <option value="PlayNothing">Play no pre-roll</option>
+                                </select>
+                            </div>
+                            <div class="checkboxContainer">
+                                <label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" id="chkFillGeneral" checked /><span>Fill leftover slots with general clips</span></label>
+                                <div class="fieldDescription checkboxFieldDescription">Used when "Clips per play" is more than the number of matching clips.</div>
+                            </div>
+
+                            <div class="inputContainer" style="margin-top:1.5em;">
+                                <label class="inputLabel" for="inputSkipTags">Never play pre-rolls before items with these tags or genres</label>
+                                <input is="emby-input" type="text" id="inputSkipTags" placeholder="e.g. NoPreroll, Documentary" list="prMediaTagList" />
+                                <div class="fieldDescription">Comma-separated.</div>
+                            </div>
+                        </div>
+
+                        <h3 class="sectionTitle">Cinema-style sequence (optional)</h3>
+                        <div class="prHelp">
+                            Play several pre-rolls in a fixed order, like a theater: e.g. <i>Logo</i> → <i>matched clip</i> → <i>Feature Presentation</i>.
+                            Each step plays one clip. When you add steps, "Clips per play" is ignored.
+                        </div>
+                        <div id="seqList"></div>
+                        <div class="prRow">
+                            <button type="button" id="btnAddSlot" class="prBtn">+ Add step</button>
+                            <button type="button" id="btnSeqPreset" class="prBtn">🎬 Cinema preset</button>
+                            <button type="button" id="btnSeqClear" class="prBtn">Clear</button>
+                        </div>
+                    </section>
+
+                    <!-- ═════════════ SCHEDULES ═════════════ -->
+                    <section class="prPanel" data-panel="schedules">
+                        <div class="prBox prHelp" style="margin-top:0;">
+                            Seasonal and time-based pre-rolls. Clips tagged with a schedule's tag <b>only</b> play while it's active,
+                            so Christmas clips never show up in July. Start from a preset, then tag your clips to match.
+                        </div>
+                        <div class="prPresets" id="schedPresets"></div>
+                        <div id="schedList"></div>
+                        <button type="button" id="btnAddSchedule" class="prBtn">+ Add custom schedule</button>
+
+                        <div class="inputContainer" style="margin-top:2em;">
+                            <label class="inputLabel" for="inputTimeZone">Time zone for schedules</label>
+                            <input is="emby-input" type="text" id="inputTimeZone" list="prTzList" />
+                            <div class="fieldDescription" id="tzHelp">Detected from your browser. NAS containers often run on UTC, so this keeps "Dec 25" and "10 PM" in your local time.</div>
+                        </div>
+                        <datalist id="prTzList"></datalist>
+                    </section>
+
+                    <div class="prSaveBar" id="prSaveBar">
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button"><span>Save</span></button>
+                        <span class="prDirty" id="prDirty">● Unsaved changes</span>
+                    </div>
+                </form>
+
+                <!-- ═════════════ CLIPS ═════════════ -->
+                <section class="prPanel" data-panel="clips">
+                    <div class="prRow">
+                        <input class="prIn grow" id="clipFilter" placeholder="Search clips or tags…" />
+                        <select class="prSel" id="clipShow">
+                            <option value="all">All clips</option>
+                            <option value="general">General (no tags)</option>
+                            <option value="tagged">Tagged</option>
+                            <option value="seasonal">Seasonal</option>
+                            <option value="off">Switched off / too long</option>
+                        </select>
+                        <button type="button" class="prBtn" id="btnClipsRefresh">Refresh</button>
+                    </div>
+                    <div class="prHelp" id="clipsSummary"></div>
+                    <div id="clipList"><div class="prMuted">Loading…</div></div>
+                    <div class="prRow" style="margin-top:1.2em;">
+                        <button type="button" class="prBtn small" id="btnResetStats">Reset play counts</button>
+                        <span class="prMuted" id="statsSince"></span>
+                    </div>
+                </section>
+
+                <!-- ═════════════ TEST ═════════════ -->
+                <section class="prPanel" data-panel="test">
+                    <div class="prHelp">Find any movie or episode to see exactly which pre-roll would play and why. Uses your <b>saved</b> settings and changes nothing.</div>
+                    <div class="prRow">
+                        <input class="prIn grow" id="testSearch" placeholder="Search movies, shows, episodes…" />
+                        <select class="prSel" id="testUser"><option value="">As: any viewer</option></select>
+                        <input class="prIn" type="datetime-local" id="testAt" title="Pretend it's this date/time (for schedules)" />
+                    </div>
+                    <div id="testResults" class="prList"></div>
+                    <div id="testOutput" style="margin-top:1em;"></div>
+                </section>
+
+                <!-- ═════════════ ACTIVITY ═════════════ -->
+                <section class="prPanel" data-panel="activity">
+                    <div class="prRow">
+                        <button type="button" id="btnRefreshActivity" class="prBtn">Refresh</button>
+                        <button type="button" id="btnClearActivity" class="prBtn">Clear</button>
+                        <label class="prMuted" style="display:inline-flex; gap:.35em; align-items:center;"><input type="checkbox" id="chkAutoRefresh" /> Auto-refresh</label>
+                    </div>
+                    <div class="prHelp">What happened on each play, newest first: which pre-roll was queued, played or skipped, and why.</div>
+                    <div id="activityList" class="prBox" style="padding:.4em .9em;">—</div>
+                </section>
+
+                <datalist id="prClipTagList"></datalist>
+                <datalist id="prMediaTagList"></datalist>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            (function () {
+                'use strict';
+
+                var pluginId = 'a4b2c3d4-e5f6-7890-abcd-ef1234567891';
+                var page = document.querySelector('#prerollConfigPage');
+                function $(sel) { return page.querySelector(sel); }
+                function $all(sel) { return Array.prototype.slice.call(page.querySelectorAll(sel)); }
+
+                var FIELDS = ['Tag', 'Genre', 'Studio', 'Rating', 'Library', 'Title', 'Type'];
+                var MODES = [['ReplaceGeneral', 'Replaces general clips'], ['Mix', 'Mixes with general clips'], ['Takeover', 'Plays before everything']];
+                var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                var DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+                var PRESETS = [
+                    { icon: '🎃', Name: 'Halloween', ClipTag: 'Halloween', StartDate: '10-01', EndDate: '10-31' },
+                    { icon: '🦃', Name: 'Thanksgiving', ClipTag: 'Thanksgiving', StartDate: '11-20', EndDate: '11-30' },
+                    { icon: '🎄', Name: 'Christmas', ClipTag: 'Christmas', StartDate: '12-01', EndDate: '12-26' },
+                    { icon: '🎆', Name: 'New Year', ClipTag: 'NewYear', StartDate: '12-30', EndDate: '01-02' },
+                    { icon: '💘', Name: "Valentine's", ClipTag: 'Valentines', StartDate: '02-07', EndDate: '02-14' },
+                    { icon: '🎇', Name: 'Fourth of July', ClipTag: 'July4', StartDate: '07-01', EndDate: '07-05' },
+                    { icon: '🍿', Name: 'Weekend nights', ClipTag: 'WeekendNight', Days: [5, 6], StartTime: '18:00', EndTime: '02:00' },
+                    { icon: '🌙', Name: 'Late night', ClipTag: 'LateNight', StartTime: '22:00', EndTime: '04:00' }
+                ];
+
+                var state = {
+                    config: null,
+                    folders: [],
+                    users: [],
+                    clips: [],
+                    disabled: {},
+                    health: null,
+                    media: { Tag: [], Genre: [], Studio: [], Rating: [], Library: [], Title: [], Type: ['Movie', 'Episode'] },
+                    dirty: false,
+                    loaded: false
+                };
+
+                // ── Utilities ─────────────────────────────────────────
+                function msg(text) {
+                    var el = $('#prerollMsg');
+                    el.style.display = text ? 'block' : 'none';
+                    el.textContent = text || '';
+                }
+                function norm(id) { return (id || '').toString().replace(/-/g, '').toLowerCase(); }
+                function lc(s) { return (s || '').toString().trim().toLowerCase(); }
+                function esc(s) {
+                    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+                    });
+                }
+                function errText(err) { return (err && (err.status || err.message)) || 'unknown error'; }
+                function uniq(list) {
+                    var seen = {}, out = [];
+                    (list || []).forEach(function (v) { var k = lc(v); if (k && !seen[k]) { seen[k] = true; out.push(String(v).trim()); } });
+                    return out.sort(function (a, b) { return a.toLowerCase() < b.toLowerCase() ? -1 : 1; });
+                }
+                function has(list, v) { v = lc(v); return (list || []).some(function (x) { return lc(x) === v; }); }
+                function fmtDur(sec) {
+                    sec = Math.round(sec || 0);
+                    return Math.floor(sec / 60) + ':' + ('0' + (sec % 60)).slice(-2);
+                }
+                function ago(iso) {
+                    var t = new Date(iso); if (isNaN(t)) { return ''; }
+                    var m = Math.round((Date.now() - t.getTime()) / 60000);
+                    if (m < 1) { return 'just now'; }
+                    if (m < 60) { return m + ' min ago'; }
+                    if (m < 1440) { return Math.round(m / 60) + ' h ago'; }
+                    return Math.round(m / 1440) + ' d ago';
+                }
+                function pluginGet(path, params) { return ApiClient.getJSON(ApiClient.getUrl('PrerollVideos/' + path, params)); }
+                function pluginSend(method, path, body) {
+                    var req = { type: method, url: ApiClient.getUrl('PrerollVideos/' + path) };
+                    if (body !== undefined) { req.data = JSON.stringify(body); req.contentType = 'application/json'; req.dataType = 'json'; }
+                    return ApiClient.ajax(req);
+                }
+                function browserTz() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { return ''; } }
+                function setDirty(v) {
+                    state.dirty = v;
+                    $('#prDirty').classList.toggle('show', !!v);
+                }
+                function datalist(id, values) {
+                    $(id).innerHTML = uniq(values).map(function (t) { return '<option value="' + esc(t) + '"></option>'; }).join('');
+                }
+
+                // ── Tabs ──────────────────────────────────────────────
+                var FORM_TABS = { overview: true, general: true, matching: true, schedules: true };
+                function showTab(name) {
+                    $all('.prTab').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-tab') === name); });
+                    $all('.prPanel').forEach(function (p) { p.classList.toggle('active', p.getAttribute('data-panel') === name); });
+                    $('#prSaveBar').style.display = FORM_TABS[name] && name !== 'overview' ? '' : 'none';
+                    if (name === 'overview') { loadHealth(); }
+                    if (name === 'clips') { loadClips(); }
+                    if (name === 'activity') { loadActivity(); }
+                    if (name === 'schedules') { renderScheduleStatus(); }
+                }
+                $all('.prTab').forEach(function (b) {
+                    b.addEventListener('click', function () { showTab(b.getAttribute('data-tab')); });
+                });
+
+                // ── Loading data ──────────────────────────────────────
+                function loadAll() {
+                    msg('');
+                    Dashboard.showLoadingMsg();
+                    Promise.all([
+                        ApiClient.getPluginConfiguration(pluginId),
+                        (typeof ApiClient.getVirtualFolders === 'function' ? ApiClient.getVirtualFolders() : ApiClient.getJSON(ApiClient.getUrl('Library/VirtualFolders'))),
+                        ApiClient.getUsers ? ApiClient.getUsers().catch(function () { return []; }) : Promise.resolve([])
+                    ]).then(function (res) {
+                        state.config = res[0] || {};
+                        state.folders = res[1] || [];
+                        state.users = res[2] || [];
+                        state.media.Library = state.folders.map(function (f) { return f.Name; });
+                        renderConfig(state.config);
+                        state.loaded = true;
+                        setDirty(false);
+                        loadHealth();
+                        loadClips(true);
+                        loadMediaValues();
+                    }).catch(function (err) {
+                        msg('Could not load settings (' + errText(err) + ').');
+                    }).then(function () { Dashboard.hideLoadingMsg(); });
+                }
+
+                function loadMediaValues() {
+                    var uid = ApiClient.getCurrentUserId();
+                    ApiClient.getJSON(ApiClient.getUrl('Items/Filters', { UserId: uid, Recursive: true, IncludeItemTypes: 'Movie,Series,Episode' }))
+                        .then(function (r) {
+                            state.media.Tag = (r && r.Tags) || [];
+                            state.media.Genre = (r && r.Genres) || [];
+                            state.media.Rating = (r && r.OfficialRatings) || [];
+                            datalist('#prMediaTagList', state.media.Tag.concat(state.media.Genre));
+                            renderChecks();
+                        }).catch(function () { /* optional */ });
+                    ApiClient.getJSON(ApiClient.getUrl('Studios', { userId: uid, Recursive: true, IncludeItemTypes: 'Movie,Series', Limit: 1000 }))
+                        .then(function (r) { state.media.Studio = ((r && r.Items) || []).map(function (s) { return s.Name; }); renderChecks(); })
+                        .catch(function () { /* optional */ });
+                    ApiClient.getJSON(ApiClient.getUrl('Users/' + uid + '/Items', { Recursive: true, IncludeItemTypes: 'Movie,Series', Limit: 3000, EnableImages: false, SortBy: 'SortName' }))
+                        .then(function (r) { state.media.Title = ((r && r.Items) || []).map(function (s) { return s.Name; }); })
+                        .catch(function () { /* optional */ });
+                }
+
+                // ── Config → form ─────────────────────────────────────
+                function renderConfig(config) {
+                    // Library select
+                    var select = $('#selectPrerollLibrary');
+                    var current = norm(config.PrerollLibraryId);
+                    select.innerHTML = '<option value="">— None (plugin off) —</option>';
+                    state.folders.forEach(function (f) {
+                        var id = f.ItemId || f.Id || '';
+                        var opt = document.createElement('option');
+                        opt.value = id;
+                        opt.textContent = f.Name;
+                        if (norm(id) === current) { opt.selected = true; }
+                        select.appendChild(opt);
+                    });
+
+                    $('#inputPrerollCount').value = config.PrerollCount || 1;
+                    $('#inputMaxDuration').value = config.MaxDurationSeconds || 0;
+                    $('#selectOrder').value = (config.Order === 'Sequential' || config.Order === 1) ? 'Sequential' : 'Shuffle';
+                    $('#chkEnableTvShows').checked = config.EnableForTvShows !== false;
+                    $('#chkEnableMovies').checked = config.EnableForMovies !== false;
+                    $('#chkAutoplay').checked = config.PlayBeforeAutoplay !== false;
+                    $('#chkWebPlayer').checked = config.EnableWebPlayerIntegration !== false;
+
+                    var cd = String(config.CooldownMinutes || 0);
+                    var cdSel = $('#selectCooldown');
+                    if (!$all('#selectCooldown option').some(function (o) { return o.value === cd; })) {
+                        var o = document.createElement('option');
+                        o.value = cd; o.textContent = 'At most once every ' + cd + ' minutes';
+                        cdSel.appendChild(o);
+                    }
+                    cdSel.value = cd;
+
+                    // Users
+                    var skip = (config.SkipUserIds || []).map(norm);
+                    $('#skipUserList').innerHTML = state.users.length ? '' : '<span class="prMuted">No users found.</span>';
+                    state.users.forEach(function (u) {
+                        $('#skipUserList').appendChild(checkboxRow('chkSkipUser', u.Id, u.Name + (u.Policy && u.Policy.IsAdministrator ? ' (admin)' : ''), skip.indexOf(norm(u.Id)) !== -1));
+                    });
+
+                    // Libraries to skip
+                    var excluded = (config.ExcludedLibraryIds || []).map(norm);
+                    $('#excludeList').innerHTML = '';
+                    state.folders.forEach(function (f) {
+                        var id = f.ItemId || f.Id || '';
+                        $('#excludeList').appendChild(checkboxRow('chkExclude', id, f.Name, excluded.indexOf(norm(id)) !== -1));
+                    });
+
+                    // Matching
+                    $('#chkTagMatching').checked = config.EnableTagMatching !== false;
+                    $('#chkAutoMatch').checked = config.AutoMatchSameTags !== false;
+                    $('#chkAutoGenres').checked = config.AutoMatchGenres !== false;
+                    $('#chkAutoStudios').checked = !!config.AutoMatchStudios;
+                    $('#chkAutoRatings').checked = !!config.AutoMatchRatings;
+                    $('#chkFillGeneral').checked = config.FillWithGeneral !== false;
+                    var nm = config.WhenNoMatch;
+                    $('#selectNoMatch').value = (nm === 'PlayAny' || nm === 1) ? 'PlayAny' : (nm === 'PlayNothing' || nm === 2) ? 'PlayNothing' : 'PlayGeneral';
+                    $('#inputSkipTags').value = (config.SkipTags || []).join(', ');
+
+                    $('#ruleList').innerHTML = '';
+                    (config.MatchRules || []).forEach(function (r) { addRuleRow(fieldName(r.Field), r.Value, r.ClipTag); });
+                    (config.TagRules || []).forEach(function (r) { addRuleRow('Tag', r.MediaTag, r.PrerollTag); });   // legacy v2 rules
+
+                    $('#seqList').innerHTML = '';
+                    (config.Sequence || []).forEach(function (s) { addSlotRow(s); });
+
+                    // Schedules
+                    $('#schedList').innerHTML = '';
+                    (config.Schedules || []).forEach(function (s) { addScheduleCard(s); });
+                    var tz = config.TimeZoneId || browserTz();
+                    $('#inputTimeZone').value = tz;
+                    $('#tzHelp').textContent = config.TimeZoneId
+                        ? 'Schedules run on this clock. Your browser is in ' + (browserTz() || 'an unknown zone') + '.'
+                        : 'Detected from your browser (' + (browserTz() || '?') + '). NAS containers often run on UTC, so this keeps "Dec 25" and "10 PM" in your local time.';
+
+                    state.disabled = {};
+                    (config.DisabledClipIds || []).forEach(function (id) { state.disabled[norm(id)] = true; });
+
+                    toggleTagOptions();
+                    renderScheduleStatus();
+                }
+
+                function checkboxRow(cls, id, label, checked) {
+                    var wrap = document.createElement('div');
+                    wrap.className = 'checkboxContainer';
+                    wrap.style.marginBottom = '.3em';
+                    wrap.innerHTML = '<label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" class="' + cls + '" /><span></span></label>';
+                    var chk = wrap.querySelector('input');
+                    chk.setAttribute('data-id', id);
+                    chk.checked = !!checked;
+                    wrap.querySelector('span').textContent = label;
+                    return wrap;
+                }
+
+                function fieldName(f) {
+                    if (typeof f === 'number') { return FIELDS[f] || 'Tag'; }
+                    return FIELDS.indexOf(f) !== -1 ? f : 'Tag';
+                }
+
+                function toggleTagOptions() {
+                    $('#tagOptions').style.opacity = $('#chkTagMatching').checked ? '1' : '.45';
+                }
+
+                // ── Rules ─────────────────────────────────────────────
+                function addRuleRow(field, value, clipTag) {
+                    var row = document.createElement('div');
+                    row.className = 'prRow prRule';
+                    var listId = 'prVals' + Math.random().toString(36).slice(2, 8);
+                    row.innerHTML =
+                        '<span class="prMuted">When</span>' +
+                        '<select class="prSel ruleField">' + FIELDS.map(function (f) { return '<option>' + f + '</option>'; }).join('') + '</select>' +
+                        '<span class="prMuted">is</span>' +
+                        '<input class="prIn grow ruleValue" placeholder="value" list="' + listId + '" />' +
+                        '<datalist id="' + listId + '"></datalist>' +
+                        '<span class="prMuted">→ play clips tagged</span>' +
+                        '<input class="prIn grow ruleClip" placeholder="clip tag" list="prClipTagList" />' +
+                        '<button type="button" class="prBtn small btnRemove" title="Remove">✕</button>';
+                    var fieldSel = row.querySelector('.ruleField');
+                    fieldSel.value = field || 'Tag';
+                    row.querySelector('.ruleValue').value = value || '';
+                    row.querySelector('.ruleClip').value = clipTag || '';
+                    function fillValues() {
+                        row.querySelector('datalist').innerHTML = uniq(state.media[fieldSel.value] || []).slice(0, 2000).map(function (v) {
+                            return '<option value="' + esc(v) + '"></option>';
+                        }).join('');
+                    }
+                    fieldSel.addEventListener('change', fillValues);
+                    row.querySelector('.ruleValue').addEventListener('focus', fillValues);
+                    row.querySelector('.btnRemove').addEventListener('click', function () { row.remove(); setDirty(true); });
+                    $('#ruleList').appendChild(row);
+                }
+
+                // ── Sequence ──────────────────────────────────────────
+                function addSlotRow(slot) {
+                    slot = slot || {};
+                    var kind = (slot.Kind === 'Tag' || slot.Kind === 1) ? 'Tag' : 'Matched';
+                    var applies = slot.AppliesTo === 'Movies' || slot.AppliesTo === 1 ? 'Movies' : slot.AppliesTo === 'Episodes' || slot.AppliesTo === 2 ? 'Episodes' : 'All';
+                    var row = document.createElement('div');
+                    row.className = 'prRow prSlot';
+                    row.innerHTML =
+                        '<span class="prMuted slotNum"></span>' +
+                        '<select class="prSel slotKind"><option value="Matched">Matched pre-roll</option><option value="Tag">Clip tagged…</option></select>' +
+                        '<input class="prIn slotTag" placeholder="clip tag, e.g. Logo" list="prClipTagList" style="width:12em;" />' +
+                        '<select class="prSel slotApplies"><option value="All">Movies &amp; episodes</option><option value="Movies">Movies only</option><option value="Episodes">Episodes only</option></select>' +
+                        '<button type="button" class="prBtn small btnUp" title="Move up">↑</button>' +
+                        '<button type="button" class="prBtn small btnDown" title="Move down">↓</button>' +
+                        '<button type="button" class="prBtn small btnRemove" title="Remove">✕</button>';
+                    row.querySelector('.slotKind').value = kind;
+                    row.querySelector('.slotTag').value = slot.ClipTag || '';
+                    row.querySelector('.slotApplies').value = applies;
+                    function sync() { row.querySelector('.slotTag').style.display = row.querySelector('.slotKind').value === 'Tag' ? '' : 'none'; }
+                    row.querySelector('.slotKind').addEventListener('change', sync);
+                    row.querySelector('.btnUp').addEventListener('click', function () { if (row.previousElementSibling) { row.parentNode.insertBefore(row, row.previousElementSibling); numberSlots(); setDirty(true); } });
+                    row.querySelector('.btnDown').addEventListener('click', function () { if (row.nextElementSibling) { row.parentNode.insertBefore(row.nextElementSibling, row); numberSlots(); setDirty(true); } });
+                    row.querySelector('.btnRemove').addEventListener('click', function () { row.remove(); numberSlots(); setDirty(true); });
+                    sync();
+                    $('#seqList').appendChild(row);
+                    numberSlots();
+                }
+                function numberSlots() { $all('#seqList .prSlot').forEach(function (r, i) { r.querySelector('.slotNum').textContent = (i + 1) + '.'; }); }
+
+                // ── Schedules ─────────────────────────────────────────
+                function monthDayPicker(cls, md) {
+                    var p = (md || '').split('-');
+                    var m = parseInt(p[0], 10) || 0, d = parseInt(p[1], 10) || 0;
+                    var html = '<select class="prSel ' + cls + 'M"><option value="0">any</option>' +
+                        MONTHS.map(function (n, i) { return '<option value="' + (i + 1) + '"' + (m === i + 1 ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select>' +
+                        '<select class="prSel ' + cls + 'D">';
+                    for (var i = 1; i <= 31; i++) { html += '<option value="' + i + '"' + (d === i ? ' selected' : '') + '>' + i + '</option>'; }
+                    return html + '</select>';
+                }
+                function readMonthDay(card, cls) {
+                    var m = parseInt(card.querySelector('.' + cls + 'M').value, 10);
+                    var d = parseInt(card.querySelector('.' + cls + 'D').value, 10);
+                    return m ? ('0' + m).slice(-2) + '-' + ('0' + d).slice(-2) : '';
+                }
+
+                function addScheduleCard(s) {
+                    s = s || {};
+                    var mode = (function (m) { if (m === 1 || m === 'Mix') { return 'Mix'; } if (m === 2 || m === 'Takeover') { return 'Takeover'; } return 'ReplaceGeneral'; })(s.Mode);
+                    var days = (s.Days || []).map(Number);
+                    var card = document.createElement('div');
+                    card.className = 'prSchedule';
+                    card.innerHTML =
+                        '<div class="prRow">' +
+                        '<label style="display:inline-flex;gap:.35em;align-items:center;"><input type="checkbox" class="schOn" /> On</label>' +
+                        '<input class="prIn schName" placeholder="Name" style="width:11em;" />' +
+                        '<span class="prMuted">plays clips tagged</span>' +
+                        '<input class="prIn schTag" placeholder="clip tag" list="prClipTagList" style="width:10em;" />' +
+                        '<span class="schStatus prBadge"></span>' +
+                        '<span style="flex:1"></span>' +
+                        '<button type="button" class="prBtn small btnRemove" title="Remove">✕</button>' +
+                        '</div>' +
+                        '<div class="prRow"><span class="prLbl">Dates</span>' + monthDayPicker('schStart', s.StartDate) + '<span class="prMuted">to</span>' + monthDayPicker('schEnd', s.EndDate) + '</div>' +
+                        '<div class="prRow"><span class="prLbl">Days</span><span class="prDays">' +
+                        DAYS.map(function (d, i) { return '<label><input type="checkbox" class="schDay" value="' + i + '"' + (days.indexOf(i) !== -1 ? ' checked' : '') + ' />' + d + '</label>'; }).join('') +
+                        '</span><span class="prMuted">(none = every day)</span></div>' +
+                        '<div class="prRow"><span class="prLbl">Hours</span><input type="time" class="prIn schFrom" /><span class="prMuted">to</span><input type="time" class="prIn schTo" /><span class="prMuted">(empty = all day)</span></div>' +
+                        '<div class="prRow"><span class="prLbl">While on</span><select class="prSel schMode">' +
+                        MODES.map(function (m) { return '<option value="' + m[0] + '">' + m[1] + '</option>'; }).join('') + '</select></div>' +
+                        '<div class="prMuted schClips"></div>';
+                    card.querySelector('.schOn').checked = s.Enabled !== false;
+                    card.querySelector('.schName').value = s.Name || '';
+                    card.querySelector('.schTag').value = s.ClipTag || '';
+                    card.querySelector('.schFrom').value = s.StartTime || '';
+                    card.querySelector('.schTo').value = s.EndTime || '';
+                    card.querySelector('.schMode').value = mode;
+                    card.querySelector('.btnRemove').addEventListener('click', function () { card.remove(); setDirty(true); });
+                    card.addEventListener('change', function () { renderScheduleStatus(); });
+                    card.addEventListener('input', function () { renderScheduleStatus(); });
+                    $('#schedList').appendChild(card);
+                    renderScheduleStatus();
+                    return card;
+                }
+
+                function readSchedule(card) {
+                    return {
+                        Enabled: card.querySelector('.schOn').checked,
+                        Name: card.querySelector('.schName').value.trim(),
+                        ClipTag: card.querySelector('.schTag').value.trim(),
+                        StartDate: readMonthDay(card, 'schStart'),
+                        EndDate: readMonthDay(card, 'schEnd'),
+                        Days: Array.prototype.slice.call(card.querySelectorAll('.schDay')).filter(function (c) { return c.checked; }).map(function (c) { return parseInt(c.value, 10); }),
+                        StartTime: card.querySelector('.schFrom').value,
+                        EndTime: card.querySelector('.schTo').value,
+                        Mode: card.querySelector('.schMode').value
+                    };
+                }
+
+                // Same rules as the server (PrerollSelector.IsActive), in the chosen time zone.
+                function nowIn(tz) {
+                    try {
+                        var parts = new Intl.DateTimeFormat('en-US', { timeZone: tz || undefined, year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date());
+                        var o = {}; parts.forEach(function (p) { o[p.type] = parseInt(p.value, 10); });
+                        return new Date(o.year, o.month - 1, o.day, o.hour % 24, o.minute);
+                    } catch (e) { return new Date(); }
+                }
+                function hm(s) { var p = (s || '').split(':'); return p.length === 2 ? parseInt(p[0], 10) * 60 + parseInt(p[1], 10) : null; }
+                function isActive(s, local) {
+                    if (!s.Enabled || !s.ClipTag) { return false; }
+                    var day = new Date(local.getFullYear(), local.getMonth(), local.getDate());
+                    var st = hm(s.StartTime), et = hm(s.EndTime);
+                    if (st !== null && et !== null && st !== et) {
+                        var tod = local.getHours() * 60 + local.getMinutes();
+                        if (st < et) { if (tod < st || tod >= et) { return false; } }
+                        else if (tod < et) { day.setDate(day.getDate() - 1); }
+                        else if (tod < st) { return false; }
+                    }
+                    if (s.Days && s.Days.length && s.Days.indexOf(day.getDay()) === -1) { return false; }
+                    var cur = (day.getMonth() + 1) * 100 + day.getDate();
+                    function md(x) { var p = (x || '').split('-'); return p.length === 2 ? parseInt(p[0], 10) * 100 + parseInt(p[1], 10) : null; }
+                    var a = md(s.StartDate), b = md(s.EndDate);
+                    if (a !== null && b !== null) { return a <= b ? (cur >= a && cur <= b) : (cur >= a || cur <= b); }
+                    if (a !== null) { return cur >= a; }
+                    if (b !== null) { return cur <= b; }
+                    return true;
+                }
+                function renderScheduleStatus() {
+                    var local = nowIn($('#inputTimeZone').value.trim() || browserTz());
+                    $all('#schedList .prSchedule').forEach(function (card) {
+                        var s = readSchedule(card);
+                        var badge = card.querySelector('.schStatus');
+                        var on = isActive(s, local);
+                        badge.textContent = !s.Enabled ? 'Off' : on ? 'Active now' : 'Not active now';
+                        badge.className = 'schStatus prBadge' + (on ? ' ok' : '');
+                        var n = state.clips.filter(function (c) { return has(c.Tags, s.ClipTag); }).length;
+                        var el = card.querySelector('.schClips');
+                        if (!s.ClipTag) { el.innerHTML = ''; }
+                        else if (n) { el.textContent = n + ' clip(s) tagged ' + s.ClipTag + '.'; }
+                        else { el.innerHTML = '<span class="warn">⚠ No clips are tagged <b>' + esc(s.ClipTag) + '</b> yet. Add the tag to some clips in the Clips tab.</span>'; }
+                    });
+                }
+                function renderPresets() {
+                    $('#schedPresets').innerHTML = '';
+                    PRESETS.forEach(function (p) {
+                        var b = document.createElement('button');
+                        b.type = 'button'; b.className = 'prBtn';
+                        b.textContent = p.icon + ' ' + p.Name;
+                        b.addEventListener('click', function () {
+                            var card = addScheduleCard({ Enabled: true, Name: p.Name, ClipTag: p.ClipTag, StartDate: p.StartDate, EndDate: p.EndDate, Days: p.Days, StartTime: p.StartTime, EndTime: p.EndTime });
+                            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            setDirty(true);
+                        });
+                        $('#schedPresets').appendChild(b);
+                    });
+                }
+
+                // ── Form → config ─────────────────────────────────────
+                function splitList(s) { return (s || '').split(',').map(function (t) { return t.trim(); }).filter(Boolean); }
+
+                function collect(config) {
+                    var libId = $('#selectPrerollLibrary').value;
+                    config.PrerollLibraryId = libId;
+                    config.PrerollCount = Math.min(5, Math.max(1, parseInt($('#inputPrerollCount').value, 10) || 1));
+                    config.MaxDurationSeconds = Math.max(0, parseInt($('#inputMaxDuration').value, 10) || 0);
+                    config.Order = $('#selectOrder').value;
+                    config.EnableForTvShows = $('#chkEnableTvShows').checked;
+                    config.EnableForMovies = $('#chkEnableMovies').checked;
+                    config.PlayBeforeAutoplay = $('#chkAutoplay').checked;
+                    config.EnableWebPlayerIntegration = $('#chkWebPlayer').checked;
+                    config.CooldownMinutes = parseInt($('#selectCooldown').value, 10) || 0;
+                    config.SkipUserIds = $all('#skipUserList .chkSkipUser').filter(function (c) { return c.checked; }).map(function (c) { return c.getAttribute('data-id'); });
+                    config.ExcludedLibraryIds = $all('#excludeList .chkExclude')
+                        .filter(function (c) { return c.checked && norm(c.getAttribute('data-id')) !== norm(libId); })
+                        .map(function (c) { return c.getAttribute('data-id'); });
+
+                    config.EnableTagMatching = $('#chkTagMatching').checked;
+                    config.AutoMatchSameTags = $('#chkAutoMatch').checked;
+                    config.AutoMatchGenres = $('#chkAutoGenres').checked;
+                    config.AutoMatchStudios = $('#chkAutoStudios').checked;
+                    config.AutoMatchRatings = $('#chkAutoRatings').checked;
+                    config.FillWithGeneral = $('#chkFillGeneral').checked;
+                    config.WhenNoMatch = $('#selectNoMatch').value;
+                    config.SkipTags = splitList($('#inputSkipTags').value);
+                    config.MatchRules = $all('#ruleList .prRule').map(function (row) {
+                        return { Field: row.querySelector('.ruleField').value, Value: row.querySelector('.ruleValue').value.trim(), ClipTag: row.querySelector('.ruleClip').value.trim() };
+                    }).filter(function (r) { return r.Value && r.ClipTag; });
+                    config.TagRules = [];   // migrated into MatchRules
+                    config.Sequence = $all('#seqList .prSlot').map(function (row) {
+                        return { Kind: row.querySelector('.slotKind').value, ClipTag: row.querySelector('.slotTag').value.trim(), AppliesTo: row.querySelector('.slotApplies').value };
+                    }).filter(function (s) { return s.Kind === 'Matched' || s.ClipTag; });
+
+                    config.Schedules = $all('#schedList .prSchedule').map(readSchedule).filter(function (s) { return s.ClipTag; });
+                    config.TimeZoneId = $('#inputTimeZone').value.trim() || browserTz();
+                    config.DisabledClipIds = Object.keys(state.disabled).filter(function (k) { return state.disabled[k]; });
+                    return config;
+                }
+
+                function saveConfig() {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        return ApiClient.updatePluginConfiguration(pluginId, collect(config));
+                    }).then(function (result) {
+                        Dashboard.processPluginConfigurationUpdateResult(result);
+                        setDirty(false);
+                        return ApiClient.getPluginConfiguration(pluginId).then(function (c) { state.config = c; });
+                    }).then(function () {
+                        loadHealth(); loadClips(true);
+                    }).catch(function (err) {
+                        Dashboard.hideLoadingMsg();
+                        msg('Save failed (' + errText(err) + ').');
+                    });
+                }
+
+                // Saves one change right away (Clips tab on/off, library created, access fixes).
+                function quickSave(mutator) {
+                    return ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        mutator(config);
+                        return ApiClient.updatePluginConfiguration(pluginId, config).then(function () { state.config = config; });
+                    });
+                }
+
+                // ── Overview / health ─────────────────────────────────
+                function loadHealth() {
+                    pluginGet('Health').then(function (h) {
+                        state.health = h;
+                        $('#prVersion').textContent = h.Version ? 'v' + h.Version : '';
+                        renderCards();
+                        renderChecks();
+                    }).catch(function (err) {
+                        $('#ovChecks').innerHTML = '<div class="bad">Could not load status (' + esc(errText(err)) + ').</div>';
+                    });
+                }
+
+                function renderCards() {
+                    var h = state.health; if (!h) { return; }
+                    var devices = h.ScriptDevices || [];
+                    var cards = [
+                        ['Pre-roll library', h.LibraryFound ? esc(h.LibraryName) : '<span class="warn">Not set</span>',
+                            h.LibraryFound ? h.ClipCount + ' clips · ' + h.EnabledCount + ' on · ' + h.AvailableNowCount + ' playable now' : 'Pick or create one below'],
+                        ['Web player', h.WebIntegration ? '<span class="ok">On</span>' : '<span class="warn">Off</span>',
+                            devices.length ? 'Seen on ' + devices.length + ' device(s), last ' + ago(devices[0].Value) : 'Not seen yet. Reload Jellyfin on your devices'],
+                        ['Schedules', h.ActiveSchedules && h.ActiveSchedules.length ? esc(h.ActiveSchedules.join(', ')) : 'None active',
+                            esc(h.ScheduleClock) + ' (' + esc(h.TimeZone) + ')'],
+                        ['Plays', String(h.TotalPlays || 0), 'pre-rolls played' + (h.StatsSince ? ' since ' + new Date(h.StatsSince).toLocaleDateString() : '') +
+                            (h.RecentWarnings ? ' · <span class="warn">' + h.RecentWarnings + ' warning(s) in 24 h</span>' : '')]
+                    ];
+                    $('#ovCards').innerHTML = cards.map(function (c) {
+                        return '<div class="prCard"><h4>' + c[0] + '</h4><div class="prBig">' + c[1] + '</div><div class="prMuted">' + c[2] + '</div></div>';
+                    }).join('');
+                    $('#ovSetup').style.display = h.LibraryFound ? 'none' : '';
+                }
+
+                function renderChecks() {
+                    var h = state.health, cfg = state.config;
+                    if (!h || !cfg) { return; }
+                    var out = [];
+                    function add(level, html, actionHtml) { out.push({ level: level, html: html, action: actionHtml || '' }); }
+
+                    if (!h.LibraryFound) {
+                        add('bad', '<b>No pre-roll library selected.</b> Create one below, or pick it on the General tab.');
+                    } else {
+                        add('ok', 'Pre-roll library <b>' + esc(h.LibraryName) + '</b> with ' + h.ClipCount + ' clip(s).');
+                        if (!h.ClipCount) { add('bad', 'The library has no videos yet. Add clips to its folder and scan the library.'); }
+                        else if (!h.AvailableNowCount) { add('bad', 'No clip can play right now (all switched off, too long, or out of season).'); }
+                        if (h.TooLongCount) { add('warn', h.TooLongCount + ' clip(s) are longer than the max clip length and will be skipped.'); }
+                        if (!h.UntaggedCount && (cfg.WhenNoMatch === 'PlayGeneral' || cfg.WhenNoMatch === 0 || cfg.WhenNoMatch == null)) {
+                            add('warn', 'You have no general (untagged) clips, so items that match nothing get no pre-roll. Leave a few clips untagged, or change "When nothing matches".');
+                        }
+                    }
+
+                    // Clip tags that nothing will ever ask for
+                    if (h.ClipTags && h.ClipTags.length && cfg.EnableTagMatching !== false) {
+                        var special = [];
+                        (cfg.Schedules || []).forEach(function (s) { special.push(s.ClipTag); });
+                        (cfg.Sequence || []).forEach(function (s) { special.push(s.ClipTag); });
+                        (cfg.MatchRules || []).forEach(function (r) { special.push(r.ClipTag); });
+                        (cfg.TagRules || []).forEach(function (r) { special.push(r.PrerollTag); });
+                        var known = [];
+                        if (cfg.AutoMatchSameTags !== false) { known = known.concat(state.media.Tag); }
+                        if (cfg.AutoMatchGenres !== false) { known = known.concat(state.media.Genre); }
+                        if (cfg.AutoMatchStudios) { known = known.concat(state.media.Studio); }
+                        if (cfg.AutoMatchRatings) { known = known.concat(state.media.Rating); }
+                        if (state.media.Tag.length || state.media.Genre.length) {
+                            var orphans = h.ClipTags.filter(function (t) { return !has(special, t) && !has(known, t); });
+                            if (orphans.length) {
+                                add('warn', 'Clip tag(s) ' + orphans.map(function (t) { return '<b>' + esc(t) + '</b>'; }).join(', ') +
+                                    " don't match any tag or genre in your library and aren't used by a rule, schedule or sequence, so those clips never play. Check the spelling, or add a rule.");
+                            } else {
+                                add('ok', 'Every clip tag matches something in your library.');
+                            }
+                        }
+                    }
+
+                    // Rules / schedules / sequence steps that point at a tag no clip has
+                    if (h.LibraryFound) {
+                        var targets = [];
+                        (cfg.MatchRules || []).forEach(function (r) { targets.push(r.ClipTag); });
+                        (cfg.TagRules || []).forEach(function (r) { targets.push(r.PrerollTag); });
+                        (cfg.Schedules || []).forEach(function (sc) { if (sc.Enabled !== false) { targets.push(sc.ClipTag); } });
+                        (cfg.Sequence || []).forEach(function (sl) { if (sl.Kind === 'Tag' || sl.Kind === 1) { targets.push(sl.ClipTag); } });
+                        var missing = uniq(targets.filter(function (t) { return t && !has(h.ClipTags, t); }));
+                        if (missing.length) {
+                            add('warn', 'Your rules, schedules or sequence use the tag(s) ' + missing.map(function (t) { return '<b>' + esc(t) + '</b>'; }).join(', ') +
+                                ', but no clip has them yet. Tag some clips on the Clips tab.', '<button type="button" class="prBtn small" data-goto="clips">Open Clips</button>');
+                        }
+                    }
+
+                    // Who can see the pre-roll library
+                    if (h.LibraryFound && state.users.length) {
+                        var lib = norm(h.LibraryId);
+                        var blocked = state.users.filter(function (u) {
+                            var p = u.Policy || {};
+                            if (p.IsDisabled || p.EnableAllFolders) { return false; }
+                            return !(p.EnabledFolders || []).some(function (f) { return norm(f) === lib; });
+                        });
+                        if (blocked.length) {
+                            add('warn', blocked.length + ' user(s) can\'t see the pre-roll library, so their pre-rolls may not play: ' +
+                                blocked.map(function (u) { return '<b>' + esc(u.Name) + '</b>'; }).join(', ') + '. (They won\'t see it on their home screen: library access only.)',
+                                '<button type="button" class="prBtn small" id="btnFixAccess">Give them access</button>');
+                        } else {
+                            add('ok', 'All users can play the pre-roll clips.');
+                        }
+                    }
+
+                    if (h.WebIntegration) {
+                        if ((h.ScriptDevices || []).length) {
+                            add('ok', 'Web player integration active on: ' + h.ScriptDevices.slice(0, 5).map(function (d) { return esc(d.Key) + ' <span class="prMuted">(' + ago(d.Value) + ')</span>'; }).join(', ') + '.');
+                        } else {
+                            add('warn', "Web player integration hasn't checked in since the server started. Reload Jellyfin in your browser (Ctrl+F5) or reopen the apps.");
+                        }
+                    }
+                    if (!h.WebIntegration && !h.ServerFallback) {
+                        add('bad', 'Both delivery options are off, so only S01E01-style starts get pre-rolls. Turn on web player integration on the General tab.');
+                    }
+                    if (h.RecentWarnings) {
+                        add('warn', h.RecentWarnings + ' warning(s) in the last 24 hours. See the Activity tab.', '<button type="button" class="prBtn small" data-goto="activity">Open Activity</button>');
+                    }
+
+                    $('#ovChecks').innerHTML = out.map(function (c) {
+                        var icon = c.level === 'ok' ? '✓' : c.level === 'warn' ? '!' : '✗';
+                        return '<div class="prCheck"><span class="prIcon ' + c.level + '">' + icon + '</span><div style="flex:1;">' + c.html + (c.action ? '<div style="margin-top:.45em;">' + c.action + '</div>' : '') + '</div></div>';
+                    }).join('');
+
+                    var fix = $('#btnFixAccess');
+                    if (fix) { fix.addEventListener('click', fixAccess); }
+                    $all('#ovChecks [data-goto]').forEach(function (b) { b.addEventListener('click', function () { showTab(b.getAttribute('data-goto')); }); });
+                }
+
+                function fixAccess() {
+                    var h = state.health; var lib = norm(h.LibraryId);
+                    var libRaw = h.LibraryId;
+                    var targets = state.users.filter(function (u) {
+                        var p = u.Policy || {};
+                        return !p.IsDisabled && !p.EnableAllFolders && !(p.EnabledFolders || []).some(function (f) { return norm(f) === lib; });
+                    });
+                    Dashboard.showLoadingMsg();
+                    Promise.all(targets.map(function (u) {
+                        var p = u.Policy;
+                        p.EnabledFolders = (p.EnabledFolders || []).concat([libRaw]);
+                        return ApiClient.updateUserPolicy(u.Id, p);
+                    })).then(function () {
+                        return ApiClient.getUsers().then(function (users) { state.users = users || []; });
+                    }).then(function () { renderChecks(); })
+                        .catch(function (err) { msg('Could not update user access (' + errText(err) + ').'); })
+                        .then(function () { Dashboard.hideLoadingMsg(); });
+                }
+
+                // Create library + folder browser
+                var browsePath = '';
+                function showFolders(path) {
+                    browsePath = path || '';
+                    $('#folderBrowser').style.display = '';
+                    $('#folderPath').textContent = browsePath || 'Drives';
+                    var p = browsePath
+                        ? ApiClient.getDirectoryContents(browsePath, { includeDirectories: true, includeFiles: false })
+                        : ApiClient.getDrives();
+                    p.then(function (items) {
+                        var list = (items || []).filter(function (i) { return !i.Type || i.Type === 'Directory' || i.Type === 'Drive' || i.Type === 'NetworkComputer'; });
+                        $('#folderList').innerHTML = list.length ? '' : '<div class="prMuted" style="padding:.4em;">No sub-folders.</div>';
+                        list.forEach(function (i) {
+                            var row = document.createElement('div');
+                            row.className = 'prFolder';
+                            row.textContent = '📁 ' + (i.Name || i.Path);
+                            row.addEventListener('click', function () { $('#newLibPath').value = i.Path; showFolders(i.Path); });
+                            $('#folderList').appendChild(row);
+                        });
+                    }).catch(function (err) { $('#folderList').innerHTML = '<div class="bad">Could not list folders (' + esc(errText(err)) + ').</div>'; });
+                }
+                $('#btnBrowse').addEventListener('click', function () { showFolders($('#newLibPath').value.trim()); });
+                $('#btnFolderUp').addEventListener('click', function () {
+                    var p = browsePath.replace(/[\\\/]+$/, '');
+                    var i = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+                    showFolders(i > 0 ? p.slice(0, i) : (i === 0 ? '/' : ''));
+                });
+                $('#btnCreateLib').addEventListener('click', function () {
+                    var name = $('#newLibName').value.trim() || 'Prerolls';
+                    var path = $('#newLibPath').value.trim();
+                    if (!path) { $('#createLibMsg').innerHTML = '<span class="warn">Pick the folder that holds your clips first.</span>'; return; }
+                    Dashboard.showLoadingMsg();
+                    $('#createLibMsg').textContent = 'Creating…';
+                    ApiClient.addVirtualFolder(name, 'homevideos', true, { PathInfos: [{ Path: path }], EnablePhotos: false })
+                        .then(function () { return ApiClient.getVirtualFolders(); })
+                        .then(function (folders) {
+                            state.folders = folders || [];
+                            var made = state.folders.filter(function (f) { return f.Name === name; })[0];
+                            if (!made) { throw new Error('library created but not found'); }
+                            return quickSave(function (c) { c.PrerollLibraryId = made.ItemId || made.Id; }).then(function () {
+                                state.config.PrerollLibraryId = made.ItemId || made.Id;
+                                renderConfig(state.config);
+                                $('#createLibMsg').innerHTML = '<span class="ok">✓ Created "' + esc(name) + '" and selected it. Jellyfin is scanning it now; clips appear in the Clips tab shortly.</span>';
+                                loadHealth();
+                                setTimeout(function () { loadClips(true); loadHealth(); }, 8000);
+                            });
+                        })
+                        .catch(function (err) { $('#createLibMsg').innerHTML = '<span class="bad">Could not create the library (' + esc(errText(err)) + ').</span>'; })
+                        .then(function () { Dashboard.hideLoadingMsg(); });
+                });
+
+                // ── Clips tab ─────────────────────────────────────────
+                function loadClips(quiet) {
+                    if (!quiet) { $('#clipList').innerHTML = '<div class="prMuted">Loading…</div>'; }
+                    return pluginGet('Clips').then(function (clips) {
+                        state.clips = clips || [];
+                        var all = [];
+                        state.clips.forEach(function (c) { all = all.concat(c.Tags || []); });
+                        datalist('#prClipTagList', all.concat((state.config && state.config.Schedules || []).map(function (s) { return s.ClipTag; })));
+                        renderClips();
+                        renderScheduleStatus();
+                    }).catch(function (err) {
+                        $('#clipList').innerHTML = '<div class="bad">Could not load clips (' + esc(errText(err)) + ').</div>';
+                    });
+                }
+
+                function renderClips() {
+                    var q = lc($('#clipFilter').value), show = $('#clipShow').value;
+                    var list = state.clips.filter(function (c) {
+                        var off = !!state.disabled[norm(c.Id)];
+                        if (show === 'general' && (c.Tags || []).length) { return false; }
+                        if (show === 'tagged' && !(c.Tags || []).length) { return false; }
+                        if (show === 'seasonal' && !c.Schedule) { return false; }
+                        if (show === 'off' && !off && !c.TooLong) { return false; }
+                        if (q && lc(c.Name).indexOf(q) === -1 && !(c.Tags || []).some(function (t) { return lc(t).indexOf(q) !== -1; })) { return false; }
+                        return true;
+                    });
+                    var general = state.clips.filter(function (c) { return !(c.Tags || []).length; }).length;
+                    $('#clipsSummary').textContent = state.clips.length + ' clip(s): ' + general + ' general, ' + (state.clips.length - general) + ' tagged. ' +
+                        'Type a tag and press Enter to add it. Changes to tags and on/off save immediately.';
+                    var since = state.health && state.health.StatsSince ? new Date(state.health.StatsSince).toLocaleDateString() : '';
+                    $('#statsSince').textContent = since ? 'Counting since ' + since + '.' : '';
+
+                    if (!list.length) {
+                        $('#clipList').innerHTML = '<div class="prMuted">' + (state.clips.length ? 'No clips match this filter.' : 'No clips found. Choose a pre-roll library (General tab) and make sure it has been scanned.') + '</div>';
+                        return;
+                    }
+                    $('#clipList').innerHTML = '';
+                    list.forEach(function (c) { $('#clipList').appendChild(clipRow(c)); });
+                }
+
+                function clipRow(c) {
+                    var off = !!state.disabled[norm(c.Id)];
+                    var row = document.createElement('div');
+                    row.className = 'prClip' + (off ? ' off' : '');
+                    var img = ApiClient.getUrl('Items/' + c.Id + '/Images/Primary', { maxHeight: 120, quality: 80 });
+                    var badges = '';
+                    if (off) { badges += '<span class="prBadge">Off</span>'; }
+                    if (c.TooLong) { badges += '<span class="prBadge warn">Too long</span>'; }
+                    if (c.Schedule) { badges += '<span class="prBadge' + (c.AvailableNow ? ' ok' : '') + '">' + esc(c.Schedule) + '</span>'; }
+                    if (!(c.Tags || []).length) { badges += '<span class="prBadge">General</span>'; }
+                    row.innerHTML =
+                        '<div class="prThumb">🎞<img loading="lazy" alt="" src="' + img + '" onerror="this.remove()" /></div>' +
+                        '<div class="prClipMain">' +
+                        '<div class="prClipName">' + esc(c.Name) + ' <span class="prMuted">' + fmtDur(c.Seconds) + '</span></div>' +
+                        '<div style="margin:.2em 0;">' + badges + '</div>' +
+                        '<div class="clipTags">' + (c.Tags || []).map(function (t) {
+                            return '<span class="prChip">' + esc(t) + '<button type="button" data-tag="' + esc(t) + '" title="Remove tag">×</button></span>';
+                        }).join('') +
+                        '<input class="prIn prTagAdd" placeholder="+ tag" list="prClipTagList" /></div>' +
+                        '<div class="prMuted" style="margin-top:.25em;">' + (c.Plays ? 'Played ' + c.Plays + '×, last ' + ago(c.LastPlayed) : 'Not played yet') + '</div>' +
+                        '</div>' +
+                        '<label style="display:inline-flex;gap:.35em;align-items:center;white-space:nowrap;"><input type="checkbox" class="clipOn"' + (off ? '' : ' checked') + ' /> On</label>';
+
+                    function setTags(tags) {
+                        pluginSend('POST', 'Clips/' + c.Id + '/Tags', { Tags: tags }).then(function (updated) {
+                            if (updated && updated.Id) {
+                                for (var k in updated) { if (Object.prototype.hasOwnProperty.call(updated, k)) { c[k] = updated[k]; } }
+                            } else { c.Tags = tags; }
+                            row.parentNode.replaceChild(clipRow(c), row);
+                            var all = []; state.clips.forEach(function (x) { all = all.concat(x.Tags || []); });
+                            datalist('#prClipTagList', all);
+                            renderScheduleStatus();
+                        }).catch(function (err) { msg('Could not save tags (' + errText(err) + ').'); });
+                    }
+                    Array.prototype.slice.call(row.querySelectorAll('.prChip button')).forEach(function (b) {
+                        b.addEventListener('click', function () {
+                            var t = b.getAttribute('data-tag');
+                            setTags((c.Tags || []).filter(function (x) { return x !== t; }));
+                        });
+                    });
+                    var input = row.querySelector('.prTagAdd');
+                    input.addEventListener('keydown', function (e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            var v = input.value.trim();
+                            if (v && !has(c.Tags, v)) { setTags((c.Tags || []).concat([v])); }
+                            input.value = '';
+                        }
+                    });
+                    row.querySelector('.clipOn').addEventListener('change', function (e) {
+                        var on = e.target.checked;
+                        state.disabled[norm(c.Id)] = !on;
+                        quickSave(function (cfg) {
+                            var set = {}; (cfg.DisabledClipIds || []).forEach(function (id) { set[norm(id)] = true; });
+                            if (on) { delete set[norm(c.Id)]; } else { set[norm(c.Id)] = true; }
+                            cfg.DisabledClipIds = Object.keys(set);
+                        }).then(function () { row.classList.toggle('off', !on); loadHealth(); })
+                            .catch(function (err) { msg('Could not save (' + errText(err) + ').'); });
+                    });
+                    return row;
+                }
+                $('#clipFilter').addEventListener('input', renderClips);
+                $('#clipShow').addEventListener('change', renderClips);
+                $('#btnClipsRefresh').addEventListener('click', function () { loadClips(); });
+                var resetArmed = false;
+                $('#btnResetStats').addEventListener('click', function () {
+                    var b = $('#btnResetStats');
+                    if (!resetArmed) { resetArmed = true; b.textContent = 'Click again to reset'; setTimeout(function () { resetArmed = false; b.textContent = 'Reset play counts'; }, 4000); return; }
+                    resetArmed = false; b.textContent = 'Reset play counts';
+                    pluginSend('POST', 'Stats/Reset').then(function () { loadHealth(); loadClips(true); });
+                });
+
+                // ── Test tab ──────────────────────────────────────────
+                var searchTimer = null;
+                $('#testSearch').addEventListener('input', function () {
+                    clearTimeout(searchTimer);
+                    searchTimer = setTimeout(runSearch, 300);
+                });
+                function resultRow(item, label, sub) {
+                    var row = document.createElement('div');
+                    row.className = 'prResult';
+                    row.innerHTML = '<span>' + (item.Type === 'Series' ? '📺' : item.Type === 'Episode' ? '🎞' : '🎬') + '</span><div><div>' + esc(label) + '</div><div class="prMuted">' + esc(sub || '') + '</div></div>';
+                    return row;
+                }
+                function runSearch() {
+                    var q = $('#testSearch').value.trim();
+                    var box = $('#testResults');
+                    if (q.length < 2) { box.innerHTML = ''; return; }
+                    ApiClient.getItems(ApiClient.getCurrentUserId(), { searchTerm: q, IncludeItemTypes: 'Movie,Series,Episode', Recursive: true, Limit: 15, Fields: 'ProductionYear' })
+                        .then(function (r) {
+                            var items = (r && r.Items) || [];
+                            box.innerHTML = items.length ? '' : '<div class="prMuted">Nothing found.</div>';
+                            items.forEach(function (it) {
+                                var sub = it.Type === 'Episode' ? (it.SeriesName || '') + (it.ParentIndexNumber != null ? ' · S' + it.ParentIndexNumber + 'E' + it.IndexNumber : '') : it.Type + (it.ProductionYear ? ' · ' + it.ProductionYear : '');
+                                var row = resultRow(it, it.Name, sub);
+                                row.addEventListener('click', function () { it.Type === 'Series' ? showEpisodes(it) : preview(it.Id); });
+                                box.appendChild(row);
+                            });
+                        });
+                }
+                function showEpisodes(series) {
+                    var box = $('#testResults');
+                    box.innerHTML = '<div class="prMuted">Episodes of ' + esc(series.Name) + ':</div>';
+                    ApiClient.getEpisodes(series.Id, { userId: ApiClient.getCurrentUserId(), Limit: 200 }).then(function (r) {
+                        ((r && r.Items) || []).forEach(function (ep) {
+                            var row = resultRow(ep, 'S' + ep.ParentIndexNumber + 'E' + ep.IndexNumber + ' · ' + ep.Name, '');
+                            row.addEventListener('click', function () { preview(ep.Id); });
+                            box.appendChild(row);
+                        });
+                    });
+                }
+                function preview(itemId) {
+                    var out = $('#testOutput');
+                    out.innerHTML = '<div class="prMuted">Checking…</div>';
+                    var at = $('#testAt').value;
+                    pluginGet('Preview', { itemId: itemId, userId: $('#testUser').value || '', at: at ? new Date(at).toISOString() : '' }).then(function (p) {
+                        var clips = (p.Clips || []).map(function (c) {
+                            var img = ApiClient.getUrl('Items/' + c.Id + '/Images/Primary', { maxHeight: 120, quality: 80 });
+                            return '<div class="prClip" style="border:0;padding:.4em 0;"><div class="prThumb">🎞<img loading="lazy" alt="" src="' + img + '" onerror="this.remove()" /></div><div><div class="prClipName">' + esc(c.Name) + '</div><div class="prMuted">' + fmtDur(c.Seconds) + ((c.Tags || []).length ? ' · ' + esc(c.Tags.join(', ')) : ' · general') + '</div></div></div>';
+                        }).join('');
+                        var facts = Object.keys(p.Facts || {}).map(function (k) {
+                            var v = p.Facts[k] || [];
+                            return '<tr><td>' + esc(k) + '</td><td>' + (v.length ? v.map(esc).join(', ') : '<span class="prMuted">—</span>') + '</td></tr>';
+                        }).join('');
+                        out.innerHTML =
+                            '<div class="prBox">' +
+                            '<div class="prMuted">' + esc(p.At) + '</div>' +
+                            '<h3 style="margin:.3em 0 .6em;">' + esc(p.ItemName) + '</h3>' +
+                            (clips ? '<div class="ok" style="font-weight:600;">✓ Would play:</div>' + clips : '<div class="warn" style="font-weight:600;">No pre-roll</div>') +
+                            '<div style="margin:.6em 0;"><b>Why:</b> ' + esc(p.Reason) + '</div>' +
+                            ((p.WantedTags || []).length ? '<div class="prMuted" style="margin-bottom:.6em;">Looks for clips tagged: ' + p.WantedTags.map(esc).join(', ') + '</div>' : '') +
+                            ((p.ActiveSchedules || []).length ? '<div class="prMuted" style="margin-bottom:.6em;">Schedules active then: ' + p.ActiveSchedules.map(esc).join(', ') + '</div>' : '') +
+                            (facts ? '<table class="prFacts">' + facts + '</table>' : '') +
+                            '<div class="prMuted" style="margin-top:.6em;">Shuffle may pick a different clip of the same kind each time.</div>' +
+                            '</div>';
+                    }).catch(function (err) { out.innerHTML = '<div class="bad">Preview failed (' + esc(errText(err)) + ').</div>'; });
+                }
+
+                // ── Activity tab ──────────────────────────────────────
+                var activityTimer = null;
+                function loadActivity() {
+                    var el = $('#activityList');
+                    pluginGet('Activity').then(function (rows) {
+                        if (!rows || !rows.length) {
+                            el.innerHTML = '<div class="prAct">Nothing yet. Play a movie or episode, then tap Refresh.</div>';
+                            return;
+                        }
+                        el.innerHTML = rows.map(function (raw) {
+                            var r = {
+                                Time: raw.Time || raw.time, Source: raw.Source || raw.source, Device: raw.Device || raw.device,
+                                Item: raw.Item || raw.item, Message: raw.Message || raw.message, Level: raw.Level || raw.level
+                            };
+                            var t = new Date(r.Time);
+                            var when = isNaN(t) ? '' : t.toLocaleString();
+                            var meta = [when, r.Source, r.Device].filter(Boolean).map(esc).join(' · ');
+                            return '<div class="prAct ' + esc(r.Level || '') + '">' +
+                                '<div class="prActMeta">' + meta + '</div>' +
+                                (r.Item ? '<div><b>' + esc(r.Item) + '</b></div>' : '') +
+                                '<div class="prActMsg">' + esc(r.Message) + '</div></div>';
+                        }).join('');
+                    }).catch(function (err) {
+                        el.textContent = 'Could not load activity (' + errText(err) + ').';
+                    });
+                }
+                $('#btnRefreshActivity').addEventListener('click', loadActivity);
+                $('#btnClearActivity').addEventListener('click', function () { pluginSend('DELETE', 'Activity').then(loadActivity, loadActivity); });
+                $('#chkAutoRefresh').addEventListener('change', function (e) {
+                    clearInterval(activityTimer);
+                    if (e.target.checked) { activityTimer = setInterval(function () { if (document.body.contains(page)) { loadActivity(); } else { clearInterval(activityTimer); } }, 5000); }
+                });
+
+                // ── Backup ────────────────────────────────────────────
+                $('#btnExport').addEventListener('click', function () {
+                    var cfg = collect(JSON.parse(JSON.stringify(state.config || {})));
+                    var names = {};
+                    state.folders.forEach(function (f) { names[norm(f.ItemId || f.Id)] = f.Name; });
+                    var data = { plugin: 'Pre-Roll Videos', exported: new Date().toISOString(), libraryNames: names, config: cfg };
+                    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    var a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'preroll-videos-settings.json';
+                    document.body.appendChild(a); a.click(); a.remove();
+                    $('#backupMsg').textContent = 'Exported.';
+                });
+                $('#btnImport').addEventListener('click', function () { $('#fileImport').click(); });
+                $('#fileImport').addEventListener('change', function (e) {
+                    var file = e.target.files && e.target.files[0];
+                    if (!file) { return; }
+                    var reader = new FileReader();
+                    reader.onload = function () {
+                        try {
+                            var data = JSON.parse(reader.result);
+                            var cfg = data.config || data;
+                            var names = data.libraryNames || {};
+                            function mapId(id) {
+                                if (!id) { return id; }
+                                var exists = state.folders.some(function (f) { return norm(f.ItemId || f.Id) === norm(id); });
+                                if (exists) { return id; }
+                                var name = names[norm(id)];
+                                var match = state.folders.filter(function (f) { return lc(f.Name) === lc(name); })[0];
+                                return match ? (match.ItemId || match.Id) : '';
+                            }
+                            cfg.PrerollLibraryId = mapId(cfg.PrerollLibraryId);
+                            cfg.ExcludedLibraryIds = (cfg.ExcludedLibraryIds || []).map(mapId).filter(Boolean);
+                            var merged = Object.assign({}, state.config || {}, cfg);
+                            renderConfig(merged);
+                            setDirty(true);
+                            $('#backupMsg').innerHTML = '<span class="ok">Imported. Review the tabs, then press Save.</span>';
+                        } catch (err) {
+                            $('#backupMsg').innerHTML = '<span class="bad">That file isn\'t a Pre-Roll Videos settings export.</span>';
+                        }
+                        e.target.value = '';
+                    };
+                    reader.readAsText(file);
+                });
+
+                // ── Sequence buttons, misc wiring ─────────────────────
+                $('#btnAddRule').addEventListener('click', function () { addRuleRow('Genre', '', ''); setDirty(true); });
+                $('#btnAddSlot').addEventListener('click', function () { addSlotRow({ Kind: 'Matched' }); setDirty(true); });
+                $('#btnSeqPreset').addEventListener('click', function () {
+                    $('#seqList').innerHTML = '';
+                    addSlotRow({ Kind: 'Tag', ClipTag: 'Logo', AppliesTo: 'All' });
+                    addSlotRow({ Kind: 'Matched', AppliesTo: 'All' });
+                    addSlotRow({ Kind: 'Tag', ClipTag: 'FeaturePresentation', AppliesTo: 'Movies' });
+                    setDirty(true);
+                });
+                $('#btnSeqClear').addEventListener('click', function () { $('#seqList').innerHTML = ''; setDirty(true); });
+                $('#btnAddSchedule').addEventListener('click', function () { addScheduleCard({ Enabled: true }); setDirty(true); });
+                $('#chkTagMatching').addEventListener('change', toggleTagOptions);
+                $('#inputTimeZone').addEventListener('input', renderScheduleStatus);
+
+                var form = $('#prerollConfigForm');
+                form.addEventListener('input', function () { if (state.loaded) { setDirty(true); } });
+                form.addEventListener('change', function () { if (state.loaded) { setDirty(true); } });
+                form.addEventListener('submit', function (e) { e.preventDefault(); saveConfig(); return false; });
+
+                try {
+                    var zones = Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [];
+                    $('#prTzList').innerHTML = zones.map(function (z) { return '<option value="' + esc(z) + '"></option>'; }).join('');
+                } catch (e) { /* older browsers */ }
+
+                (function testDefaults() {
+                    var d = new Date(); d.setSeconds(0, 0);
+                    var local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                    $('#testAt').value = local;
+                })();
+
+                renderPresets();
+                page.addEventListener('pageshow', function () {
+                    loadAll();
+                    ApiClient.getUsers && ApiClient.getUsers().then(function (users) {
+                        $('#testUser').innerHTML = '<option value="">As: any viewer</option>' + (users || []).map(function (u) { return '<option value="' + esc(u.Id) + '">As: ' + esc(u.Name) + '</option>'; }).join('');
+                    }).catch(function () { /* optional */ });
+                });
+                showTab('overview');
+            })();
+        </script>
+    </div>
+</body>
+</html>

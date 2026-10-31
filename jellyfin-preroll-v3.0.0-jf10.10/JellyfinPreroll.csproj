@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <AssemblyName>JellyfinPreroll</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>14.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
+  </PropertyGroup>
+  <PropertyGroup>
+    <RootNamespace />
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="JellyfinPreroll.Configuration.configPage.html" />
+    <None Remove="JellyfinPreroll.Web.prerollClient.js" />
+    <EmbeddedResource Include="JellyfinPreroll.Configuration.configPage.html" LogicalName="JellyfinPreroll.Configuration.configPage.html" />
+    <EmbeddedResource Include="JellyfinPreroll.Web.prerollClient.js" LogicalName="JellyfinPreroll.Web.prerollClient.js" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="MediaBrowser.Common" />
+    <Reference Include="MediaBrowser.Model" />
+    <Reference Include="MediaBrowser.Controller" />
+    <Reference Include="Jellyfin.Data" />
+  </ItemGroup>
+</Project>
