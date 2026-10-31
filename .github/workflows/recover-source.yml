@@ -1,0 +1,38 @@
+name: Recover 3.0 source
+
+# One-off: the v3.0.0 release DLLs were built from code that was never committed. This decompiles
+# them (ILSpy) so the 3.0 code can be restored in the repository. Output goes to branch recovered-3.0.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+      - name: Download and decompile
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dotnet tool install -g ilspycmd
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          mkdir -p z out
+          gh release download v3.0.0 -R ${{ github.repository }} -D z
+          for f in z/*.zip; do n=$(basename "$f" .zip); mkdir -p "u/$n"; unzip -oq "$f" -d "u/$n"; done
+          for d in u/*; do n=$(basename "$d"); ilspycmd -p -o "out/$n" "$d/JellyfinPreroll.dll" || ilspycmd -p -o "out/$n" "$d"/*.dll; done
+          ls -R out | head -80
+      - name: Push to recovered-3.0
+        run: |
+          cd out
+          git init -q . && git checkout -q -b recovered-3.0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -qm "Decompiled v3.0.0 release DLLs"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" recovered-3.0
