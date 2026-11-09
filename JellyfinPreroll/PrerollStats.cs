@@ -40,7 +40,25 @@ public static class PrerollStats
 			value.Plays++;
 			value.LastPlayed = utc.ToString("o");
 			statsFile.TotalPlays++;
+			ShuffleDeck.MarkPlayed(statsFile.Decks, clip.Id, utc);
 			ScheduleSave();
+		}
+	}
+
+	/// <summary>Read or change the shuffle decks (saved with the play counts).</summary>
+	internal static T WithDecks<T>(bool save, Func<Dictionary<string, DeckState>, T> action)
+	{
+		lock (_fileLock)
+		{
+			StatsFile statsFile = Load();
+			statsFile.Decks ??= new Dictionary<string, DeckState>();
+			T result = action(statsFile.Decks);
+			if (save)
+			{
+				ScheduleSave();
+			}
+
+			return result;
 		}
 	}
 

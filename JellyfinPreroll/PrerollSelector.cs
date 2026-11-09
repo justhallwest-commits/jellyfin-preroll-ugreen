@@ -23,10 +23,6 @@ public class PrerollSelector
 
 	private static readonly object _stateLock = new object();
 
-	private static readonly Random _rng = new Random();
-
-	private static readonly Dictionary<string, HashSet<Guid>> _lastPlayed = new Dictionary<string, HashSet<Guid>>();
-
 	private static readonly Dictionary<string, int> _sequentialIndex = new Dictionary<string, int>();
 
 	private static readonly TimeSpan PoolCacheTime = TimeSpan.FromSeconds(15.0);
@@ -426,7 +422,7 @@ public class PrerollSelector
 				if (item2.Kind == SlotKind.Tag)
 				{
 					string tag = (item2.ClipTag ?? string.Empty).Trim();
-					List<BaseItem> list6 = Pick(list5.Where((BaseItem c) => ClipTags(c).Contains(tag)).ToList(), 1, "seq:" + tag, pluginConfiguration.Order, ctx.DryRun);
+					List<BaseItem> list6 = Pick(list5.Where((BaseItem c) => ClipTags(c).Contains(tag)).ToList(), 1, "seq:" + tag, pluginConfiguration.Order, ctx);
 					chosen.AddRange(list6);
 					list4.Add((list6.Count > 0) ? tag : ("(no clip tagged " + tag + ")"));
 				}
@@ -460,7 +456,7 @@ public class PrerollSelector
 	private List<BaseItem> PickCore(List<BaseItem> pool, int count, PickEnv env, out string reason, List<string> wantedOut)
 	{
 		PluginConfiguration config = env.Config;
-		bool dryRun = env.Ctx.DryRun;
+		SelectionContext pickCtx = env.Ctx;
 		List<PrerollSchedule> list = env.Active.Where((PrerollSchedule s) => s.Mode == ScheduleMode.Takeover).ToList();
 		if (list.Count > 0)
 		{
@@ -469,7 +465,7 @@ public class PrerollSelector
 			if (list2.Count > 0)
 			{
 				reason = "schedule " + string.Join(", ", list.Select(Label)) + " (plays before everything)";
-				return Pick(list2, count, "sched:" + string.Join("|", tags.OrderBy((string t) => t, Ci)), config.Order, dryRun);
+				return Pick(list2, count, "sched:" + string.Join("|", tags.OrderBy((string t) => t, Ci)), config.Order, pickCtx);
 			}
 		}
 		List<PrerollSchedule> source = env.Active.Where((PrerollSchedule s) => s.Mode == ScheduleMode.ReplaceGeneral).ToList();
@@ -502,7 +498,7 @@ public class PrerollSelector
 		if (!config.EnableTagMatching)
 		{
 			reason = text;
-			return Pick(list5, count, "general:" + text, config.Order, dryRun);
+			return Pick(list5, count, "general:" + text, config.Order, pickCtx);
 		}
 		Dictionary<string, string> wanted = new Dictionary<string, string>(Ci);
 		if (config.AutoMatchSameTags)
@@ -555,12 +551,12 @@ public class PrerollSelector
 			List<string> list7 = list6.SelectMany(ClipTags).Where(wanted.ContainsKey).Distinct(Ci)
 				.OrderBy((string t) => t, Ci)
 				.ToList();
-			List<BaseItem> list8 = Pick(list6, count, "tag:" + string.Join("|", list7), config.Order, dryRun);
+			List<BaseItem> list8 = Pick(list6, count, "tag:" + string.Join("|", list7), config.Order, pickCtx);
 			reason = "matched " + string.Join(", ", list7.Select((string t) => t + " (" + wanted[t] + ")"));
 			if (list8.Count < count && config.FillWithGeneral && list5.Count > 0)
 			{
 				HashSet<Guid> ids = list8.Select((BaseItem p) => p.Id).ToHashSet();
-				List<BaseItem> list9 = Pick(list5.Where((BaseItem g) => !ids.Contains(g.Id)).ToList(), count - list8.Count, "general:" + text, config.Order, dryRun);
+				List<BaseItem> list9 = Pick(list5.Where((BaseItem g) => !ids.Contains(g.Id)).ToList(), count - list8.Count, "general:" + text, config.Order, pickCtx);
 				list8.AddRange(list9);
 				if (list9.Count > 0)
 				{
@@ -576,7 +572,7 @@ public class PrerollSelector
 			{
 				List<string> used = similarClips.SelectMany(ClipTags).Where(env.Facts.Similar.ContainsKey).Distinct(Ci).OrderBy((string t) => t, Ci).ToList();
 				reason = "no direct match; like " + string.Join(", ", used.Select((string t) => t + " (" + env.Facts.Similar[t] + ")"));
-				return Pick(similarClips, count, "similar:" + string.Join("|", used), config.Order, dryRun);
+				return Pick(similarClips, count, "similar:" + string.Join("|", used), config.Order, pickCtx);
 			}
 		}
 		switch (config.WhenNoMatch)
@@ -586,10 +582,10 @@ public class PrerollSelector
 			return new List<BaseItem>();
 		case NoMatchBehavior.PlayAny:
 			reason = "no match, any clip";
-			return Pick(pool, count, "all", config.Order, dryRun);
+			return Pick(pool, count, "all", config.Order, pickCtx);
 		default:
 			reason = ((list5.Count > 0) ? ("no match, " + text) : "no match and no untagged (general) clips");
-			return Pick(list5, count, "general:" + text, config.Order, dryRun);
+			return Pick(list5, count, "general:" + text, config.Order, pickCtx);
 		}
 		void Want(IEnumerable<string> values, string kind)
 		{
@@ -880,41 +876,31 @@ public class PrerollSelector
 		return list.ToList();
 	}
 
-	private static List<BaseItem> Pick(List<BaseItem> pool, int count, string key, PrerollOrder order, bool dryRun)
+	private static List<BaseItem> Pick(List<BaseItem> pool, int count, string key, PrerollOrder order, SelectionContext ctx)
 	{
 		count = Math.Min(count, pool.Count);
 		if (count <= 0)
 		{
 			return new List<BaseItem>();
 		}
+		if (order != PrerollOrder.Sequential)
+		{
+			// Shuffle: every clip gets a turn before any repeats (see ShuffleDeck).
+			return ShuffleDeck.Pick(pool, count, key, ShuffleDeck.ModeFor(ctx));
+		}
 		lock (_stateLock)
 		{
-			if (order == PrerollOrder.Sequential)
+			_sequentialIndex.TryGetValue(key, out var value);
+			List<BaseItem> list = new List<BaseItem>(count);
+			for (int i = 0; i < count; i++)
 			{
-				_sequentialIndex.TryGetValue(key, out var value);
-				List<BaseItem> list = new List<BaseItem>(count);
-				for (int i = 0; i < count; i++)
-				{
-					list.Add(pool[(value + i) % pool.Count]);
-				}
-				if (!dryRun)
-				{
-					_sequentialIndex[key] = (value + count) % pool.Count;
-				}
-				return list;
+				list.Add(pool[(value + i) % pool.Count]);
 			}
-			_lastPlayed.TryGetValue(key, out HashSet<Guid> last);
-			if (last == null)
+			if (!ctx.DryRun)
 			{
-				last = new HashSet<Guid>();
+				_sequentialIndex[key] = (value + count) % pool.Count;
 			}
-			List<BaseItem> list2 = pool.Where((BaseItem v) => !last.Contains(v.Id)).ToList();
-			List<BaseItem> list3 = ((list2.Count >= count) ? list2 : pool).OrderBy((BaseItem _) => _rng.Next()).Take(count).ToList();
-			if (!dryRun)
-			{
-				_lastPlayed[key] = list3.Select((BaseItem v) => v.Id).ToHashSet();
-			}
-			return list3;
+			return list;
 		}
 	}
 }

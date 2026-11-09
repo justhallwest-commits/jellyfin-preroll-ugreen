@@ -39,6 +39,9 @@ public class HealthResponse
 
 	public List<KeyValuePair<string, string>> NativeDevices { get; set; } = new List<KeyValuePair<string, string>>();
 
+	/// <summary>Shuffle progress per pool, e.g. "General clips: 3 of 10 played this round".</summary>
+	public List<string> ShuffleProgress { get; set; } = new List<string>();
+
 	public List<KeyValuePair<string, string>> ScriptDevices { get; set; } = new List<KeyValuePair<string, string>>();
 
 	public int RecentWarnings { get; set; }

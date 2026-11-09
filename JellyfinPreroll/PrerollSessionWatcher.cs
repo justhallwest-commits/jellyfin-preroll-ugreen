@@ -233,7 +233,9 @@ public sealed class PrerollSessionWatcher : IHostedService, IDisposable
 			SelectionResult selectionResult2 = _selector.Evaluate(item, new SelectionContext
 			{
 				UserId = session.UserId,
-				AtUtc = dateTime
+				AtUtc = dateTime,
+				// For TV apps the queue planner below picks this item's clips; don't use up a turn twice.
+				DryRun = tvApp
 			}, "autoplay", quiet: true);
 			List<BaseItem> list2 = ((selectionResult2.Clips.Count > 0) ? selectionResult2.Clips : selectionResult.Clips);
 			string text3 = ((selectionResult2.Clips.Count > 0) ? selectionResult2.Reason : selectionResult.Reason);

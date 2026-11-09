@@ -1,9 +1,19 @@
-# Jellyfin Preroll Ugreen: Pre-Roll Videos 3.2.1
+# Jellyfin Preroll Ugreen: Pre-Roll Videos 3.3
 
 Plays clips from a library you choose (studio logos, HallFlix bumpers, intros) before movies and TV episodes,
 including every episode you pick and every episode that autoplays, in the browser and in the Jellyfin app on
 Fire TV / Android TV. Builds for **Jellyfin 10.10**, **10.11** and **12**; the Jellyfin catalog picks the right one
 for your server automatically.
+
+## What's new in 3.3: a real shuffle
+- **Shuffle now works like a shuffled deck:** every clip plays once, in random order, before any clip repeats. Then
+  the deck is reshuffled, and the clip that just played never comes first in the new round. Before, Shuffle only
+  avoided the clip from the previous pick, so a favourite could come back after one other clip.
+- Each kind of pre-roll has its own deck (general clips, each tag, each schedule, sequence steps).
+- Clips planned for later episodes in a queue (web player and Fire TV) only count once they actually play, so a
+  binge you stop after one episode doesn't use up the deck.
+- Rounds are saved with the play counts, so a Jellyfin restart doesn't start over.
+- Overview shows the progress, e.g. "General clips: 4 of 10 played this round".
 
 ## What's new in 3.2.1: Fire TV / Android TV app
 The Jellyfin app on Fire TV doesn't use the web player, and it only asks the server for pre-rolls before **movies**.
@@ -79,9 +89,11 @@ happens, so **neither the pre-roll nor the episode played**.
 - Resumed items keep resuming without a pre-roll. The episodes after them still get one.
 
 ## Releasing an update (GitHub website only)
-**Actions → Build & release → Run workflow** → version like `3.2.1`.
+**Actions → Build & release → Run workflow** → version like `3.3.0`.
 One release with three zips (10.10, 10.11 and 12); `manifest.json` is updated automatically.
-The 10.10 build gets version `1.<major×10+minor>.<patch>.0` (3.2.1 → 1.32.1.0) so newer servers never pick it.
+The combined **HallFlix Package** catalog (jellyfin-artwork-studio → `catalog/manifest.json`) copies it in on its next
+scheduled run; to get it sooner, run **Actions → HallFlix plugin catalog** in the jellyfin-artwork-studio repo.
+The 10.10 build gets version `1.<major×10+minor>.<patch>.0` (3.3.0 → 1.33.0.0) so newer servers never pick it.
 
 ## Troubleshooting
 Start with the **Overview** tab; most problems show up there with a fix. Then check **Activity**, which shows what
@@ -92,6 +104,7 @@ happened on each play and why.
 | Settings page looks old after updating | Restart Jellyfin, then Ctrl+F5 (or try a private window). |
 | Only some episodes get a pre-roll | Make sure "Web player integration" is on, and look in Activity for "Web player integration active". |
 | A clip never plays | Clips tab: is it On, short enough, in season? Test tab shows why something else was picked. |
+| Shuffle repeats a clip before others played | Each kind of pre-roll has its own deck: a Horror clip and a general clip are separate rounds. Overview shows each deck's progress. |
 | Seasonal clip plays at the wrong time | Schedules tab → check the time zone. |
 | Fire TV: movies get a pre-roll but episodes don't | Update to 3.2.1+, restart Jellyfin, and check Activity for "TV app queue" after playing an episode on the Fire TV. |
 | Fire TV: pressing Play on an episode plays nothing / goes back to the episode page | Plugin older than 3.2.1: update. Its fallback sent a play command mid-playback, which closes the app's player. |
@@ -114,6 +127,7 @@ JellyfinPreroll/                      plugin source (net8.0 for 10.10, net9.0 fo
   PrerollSessionWatcher.cs            server fallback + per-play activity
   NativeQueueFilter.cs                Fire TV / Android TV app: pre-rolls in its episode queue, ordered /Items?ids
   PrerollQueuePlanner.cs              plans pre-rolls along a whole play queue (schedules, frequency limit)
+  ShuffleDeck.cs                      Shuffle order: every clip gets a turn before any repeats (saved rounds)
   WebPlayerInjection.cs               adds the script to the web app's index.html (in memory)
   Web/prerollClient.js                web player integration (queue building)
   Configuration/configPage.html       the settings page (script must stay inside the page div)

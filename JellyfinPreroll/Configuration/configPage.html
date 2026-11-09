@@ -150,9 +150,12 @@
                         <div class="selectContainer">
                             <label class="selectLabel" for="selectOrder">Order</label>
                             <select is="emby-select" id="selectOrder" class="emby-select-withcolor">
-                                <option value="Shuffle">Shuffle (avoids repeating the last clip)</option>
+                                <option value="Shuffle">Shuffle (every clip plays once before any repeats)</option>
                                 <option value="Sequential">Sequential (rotate A→Z)</option>
                             </select>
+                            <div class="fieldDescription">Shuffle works like a shuffled deck: each clip gets a turn in random order, then the deck is
+                                reshuffled (the clip that just played never comes first). Each kind of pre-roll (general, a tag, a schedule)
+                                has its own deck. Clips queued for later episodes only count once they actually play.</div>
                         </div>
 
                         <div class="inputContainer">
@@ -1042,6 +1045,9 @@
                     } else {
                         add('warn', 'Fire TV / Android TV app support is off, so episodes played in that app only get a pre-roll through the server fallback (with a flash), if at all. Turn it on on the General tab.');
                     }
+                    if ((h.ShuffleProgress || []).length) {
+                        add('ok', 'Shuffle: ' + h.ShuffleProgress.map(esc).join(' · ') + '.');
+                    }
                     if (!h.WebIntegration && !h.ServerFallback) {
                         add('bad', 'Both delivery options are off, so only S01E01-style starts get pre-rolls. Turn on web player integration on the General tab.');
                     }
@@ -1302,7 +1308,7 @@
                             ((p.WantedTags || []).length ? '<div class="prMuted" style="margin-bottom:.6em;">Looks for clips tagged: ' + p.WantedTags.map(esc).join(', ') + '</div>' : '') +
                             ((p.ActiveSchedules || []).length ? '<div class="prMuted" style="margin-bottom:.6em;">Schedules active then: ' + p.ActiveSchedules.map(esc).join(', ') + '</div>' : '') +
                             (facts ? '<table class="prFacts">' + facts + '</table>' : '') +
-                            '<div class="prMuted" style="margin-top:.6em;">Shuffle may pick a different clip of the same kind each time.</div>' +
+                            '<div class="prMuted" style="margin-top:.6em;">With Shuffle, this shows one of the clips that haven\'t had their turn yet this round.</div>' +
                             '</div>';
                     }).catch(function (err) { out.innerHTML = '<div class="bad">Preview failed (' + esc(errText(err)) + ').</div>'; });
                 }

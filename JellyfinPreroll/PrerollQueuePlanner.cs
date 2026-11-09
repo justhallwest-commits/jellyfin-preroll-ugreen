@@ -102,7 +102,9 @@ public static class PrerollQueuePlanner
 				UserId = userId,
 				AtUtc = t,
 				HasLastPrerollOverride = true,
-				LastPrerollUtc = last
+				LastPrerollUtc = last,
+				// Only the first item is about to play; the rest may never be reached.
+				PlanAhead = i > 0
 			};
 			SelectionResult result = selector.Evaluate(item, ctx, trigger, i > 0);
 			if (i == 0)

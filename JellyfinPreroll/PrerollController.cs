@@ -89,7 +89,8 @@ public class PrerollController : ControllerBase
 				UserId = userId,
 				AtUtc = utcNow,
 				HasLastPrerollOverride = true,
-				LastPrerollUtc = lastPrerollUtc
+				LastPrerollUtc = lastPrerollUtc,
+				PlanAhead = num3 > 0
 			};
 			SelectionResult selectionResult = _selector.Evaluate(itemById, ctx, "web player", num3 > 0);
 			if (num3 == 0)
@@ -180,9 +181,34 @@ public class PrerollController : ControllerBase
 		healthResponse2.NativeQueue = pluginConfiguration.EnableNativeAppQueue;
 		healthResponse2.NativeDevices = (from kv in PrerollStats.NativeDevices().Take(12)
 			select new KeyValuePair<string, string>(kv.Key, kv.Value.ToString("o"))).ToList();
+		if (pluginConfiguration.Order != PrerollOrder.Sequential)
+		{
+			healthResponse2.ShuffleProgress = ShuffleDeck.Summary()
+				.Where(d => d.Total > 1)
+				.Take(4)
+				.Select(d => DeckLabel(d.Pool) + ": " + d.Played + " of " + d.Total + " played this round" + (d.Rounds > 0 ? " (" + d.Rounds + " full round" + (d.Rounds == 1 ? "" : "s") + " so far)" : string.Empty))
+				.ToList();
+		}
 		healthResponse2.RecentWarnings = Enumerable.Count(PrerollActivityLog.Snapshot(), (PrerollActivityEntry a) => a.Level == "warn" && DateTime.TryParse(a.Time, out var result2) && now - result2.ToUniversalTime() < TimeSpan.FromHours(24.0));
 		(healthResponse2.TotalPlays, healthResponse2.StatsSince) = PrerollStats.Totals();
 		return healthResponse2;
+	}
+
+	private static string DeckLabel(string key)
+	{
+		int colon = key.IndexOf(':');
+		string kind = colon < 0 ? key : key.Substring(0, colon);
+		string rest = colon < 0 ? string.Empty : key.Substring(colon + 1).Replace("|", ", ");
+		return kind switch
+		{
+			"general" => "General clips",
+			"tag" => "Clips tagged " + rest,
+			"sched" => "Schedule clips (" + rest + ")",
+			"seq" => "Sequence step " + rest,
+			"similar" => "Similar-title clips",
+			"all" => "All clips",
+			_ => key
+		};
 	}
 
 	[HttpGet("Clips")]
