@@ -23,6 +23,15 @@ public class PluginConfiguration : BasePluginConfiguration
 
 	public bool EnableWebPlayerIntegration { get; set; } = true;
 
+	/// <summary>
+	/// Add pre-rolls to the episode queue that TV apps without the web player build themselves
+	/// (the Jellyfin app on Fire TV / Android TV), so every episode gets its pre-roll.
+	/// </summary>
+	public bool EnableNativeAppQueue { get; set; } = true;
+
+	/// <summary>Which apps that applies to: comma-separated parts of the app name (default "Android TV", which covers Fire TV).</summary>
+	public string NativeAppClients { get; set; } = "Android TV";
+
 	public string[] ExcludedLibraryIds { get; set; } = Array.Empty<string>();
 
 	public string[] SkipUserIds { get; set; } = Array.Empty<string>();

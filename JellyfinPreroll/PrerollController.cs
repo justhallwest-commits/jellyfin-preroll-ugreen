@@ -177,6 +177,9 @@ public class PrerollController : ControllerBase
 		healthResponse2.ActiveSchedules = _selector.GetActiveSchedules(now).Select(PrerollSelector.Label).ToList();
 		healthResponse2.ScriptDevices = (from kv in PrerollStats.ScriptDevices().Take(12)
 			select new KeyValuePair<string, string>(kv.Key, kv.Value.ToString("o"))).ToList();
+		healthResponse2.NativeQueue = pluginConfiguration.EnableNativeAppQueue;
+		healthResponse2.NativeDevices = (from kv in PrerollStats.NativeDevices().Take(12)
+			select new KeyValuePair<string, string>(kv.Key, kv.Value.ToString("o"))).ToList();
 		healthResponse2.RecentWarnings = Enumerable.Count(PrerollActivityLog.Snapshot(), (PrerollActivityEntry a) => a.Level == "warn" && DateTime.TryParse(a.Time, out var result2) && now - result2.ToUniversalTime() < TimeSpan.FromHours(24.0));
 		(healthResponse2.TotalPlays, healthResponse2.StatsSince) = PrerollStats.Totals();
 		return healthResponse2;

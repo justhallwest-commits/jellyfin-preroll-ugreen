@@ -90,6 +90,19 @@ public static class PrerollStats
 		return _scriptSeen.OrderByDescending((KeyValuePair<string, DateTime> kv) => kv.Value).ToList();
 	}
 
+	private static readonly ConcurrentDictionary<string, DateTime> _nativeSeen = new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+
+	/// <summary>A TV app (Fire TV / Android TV) asked for an episode queue that the plugin handled.</summary>
+	public static void NativeSeen(string device)
+	{
+		_nativeSeen[string.IsNullOrWhiteSpace(device) ? "(unknown device)" : device] = DateTime.UtcNow;
+	}
+
+	public static List<KeyValuePair<string, DateTime>> NativeDevices()
+	{
+		return _nativeSeen.OrderByDescending((KeyValuePair<string, DateTime> kv) => kv.Value).ToList();
+	}
+
 	private static string? FilePath()
 	{
 		try

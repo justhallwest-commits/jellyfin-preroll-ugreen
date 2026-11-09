@@ -179,7 +179,14 @@ public sealed class PrerollSessionWatcher : IHostedService, IDisposable
 			if (orAdd.PendingItemId == item.Id && dateTime - orAdd.PendingSinceUtc < PendingTimeout)
 			{
 				orAdd.PendingItemId = Guid.Empty;
-				PrerollActivityLog.Add("Playback", text, text2, "✓ Pre-roll played first (" + orAdd.LastPrerollName + ", added by the server fallback)", "ok");
+				if (orAdd.LastPrerollStartUtc >= orAdd.PendingSinceUtc)
+				{
+					PrerollActivityLog.Add("Playback", text, text2, "✓ Pre-roll played first (" + orAdd.LastPrerollName + ", added by the server fallback)", "ok");
+				}
+				else
+				{
+					PrerollActivityLog.Add("Playback", text, text2, "✗ The app restarted it without playing the pre-roll the server sent", "warn");
+				}
 				return;
 			}
 			if (dateTime - orAdd.LastPrerollStopUtc < AfterPrerollGrace || dateTime - orAdd.LastPrerollStartUtc < orAdd.LastPrerollLength + AfterPrerollGrace)
@@ -214,6 +221,15 @@ public sealed class PrerollSessionWatcher : IHostedService, IDisposable
 				PrerollActivityLog.Add("Playback", text, text2, "✗ Started without a pre-roll — this app doesn't accept remote play commands, so the server can't add one", "warn");
 				return;
 			}
+			bool tvApp = pluginConfiguration.EnableNativeAppQueue && PrerollQueuePlanner.IsNativeApp(session.Client, pluginConfiguration);
+			bool stopFirst = tvApp || PrerollQueuePlanner.IsAndroidTvApp(session.Client);
+			if (tvApp && NativeQueueMemory.WasPlannedWithoutClip(session.UserId, item.Id, dateTime))
+			{
+				// The TV app's own queue left this one out (frequency limit / schedule as planned when the
+				// queue was built). Stopping the app mid-queue to add one would be worse than skipping it.
+				PrerollActivityLog.Add("Playback", text, text2, "No pre-roll: the TV app's queue left this one out when it was planned (frequency limit or schedule), and the server doesn't interrupt that queue");
+				return;
+			}
 			SelectionResult selectionResult2 = _selector.Evaluate(item, new SelectionContext
 			{
 				UserId = session.UserId,
@@ -221,8 +237,6 @@ public sealed class PrerollSessionWatcher : IHostedService, IDisposable
 			}, "autoplay", quiet: true);
 			List<BaseItem> list2 = ((selectionResult2.Clips.Count > 0) ? selectionResult2.Clips : selectionResult.Clips);
 			string text3 = ((selectionResult2.Clips.Count > 0) ? selectionResult2.Reason : selectionResult.Reason);
-			List<Guid> list3 = list2.Select((BaseItem c) => c.Id).ToList();
-			list3.Add(item.Id);
 			List<User> users = e.Users;
 			bool? flag;
 			if (users == null)
@@ -236,9 +250,35 @@ public sealed class PrerollSessionWatcher : IHostedService, IDisposable
 			}
 			bool flag2 = flag ?? true;
 			Episode val2 = (Episode)(object)((item is Episode) ? item : null);
-			if ((val2 != null) & flag2)
+			List<BaseItem> following = (val2 != null && flag2) ? GetFollowingEpisodeItems(val2) : new List<BaseItem>();
+			List<Guid> list3 = new List<Guid>();
+			if (tvApp)
 			{
-				list3.AddRange(GetFollowingEpisodes(val2));
+				// TV app: pre-roll → episode → pre-roll → next episode…, so the episodes that follow
+				// don't each start without a pre-roll and need another restart.
+				List<BaseItem> queueItems = new List<BaseItem> { item };
+				queueItems.AddRange(following);
+				QueuePlan plan = PrerollQueuePlanner.Plan(_selector, queueItems, session.UserId, "server fallback");
+				if (plan.Before.TryGetValue(item.Id, out List<BaseItem>? planned) && planned.Count > 0)
+				{
+					list2 = planned;
+					text3 = plan.FirstReason;
+				}
+				foreach (BaseItem queued in queueItems)
+				{
+					List<BaseItem>? before = queued.Id == item.Id ? list2 : (plan.Before.TryGetValue(queued.Id, out List<BaseItem>? c) ? c : null);
+					if (before != null)
+					{
+						list3.AddRange(before.Select((BaseItem b) => b.Id));
+					}
+					list3.Add(queued.Id);
+				}
+			}
+			else
+			{
+				list3.AddRange(list2.Select((BaseItem c) => c.Id));
+				list3.Add(item.Id);
+				list3.AddRange(following.Select((BaseItem f) => f.Id));
 			}
 			orAdd.PendingItemId = item.Id;
 			orAdd.PendingSinceUtc = dateTime;
@@ -246,11 +286,99 @@ public sealed class PrerollSessionWatcher : IHostedService, IDisposable
 			{
 				ItemIds = list3.ToArray(),
 				PlayCommand = (PlayCommand)0,
-				StartIndex = 0
+				StartIndex = 0,
+				// The queue starts with a pre-roll: from the top, not from the episode's old position.
+				StartPositionTicks = 0
 			};
 			_logger.LogInformation("Pre-Roll Videos: inserting {Count} pre-roll(s) before \"{Item}\" on {Device}", list2.Count, item.Name, text);
-			PrerollActivityLog.Add("Server fallback", text, text2, "Started without a pre-roll → told the app to play " + string.Join(", ", list2.Select((BaseItem c) => c.Name)) + " first [" + text3 + "]");
-			SendAsync(session.Id, request, text2, text);
+			string clipNames = string.Join(", ", list2.Select((BaseItem c) => c.Name));
+			if (stopFirst)
+			{
+				// The Fire TV / Android TV app closes its player when a play command arrives while a video
+				// is playing (the old player's shutdown also closes the new one), so nothing would play at
+				// all. Stop the episode first, wait until the app says it stopped, then send the queue.
+				PrerollActivityLog.Add("Server fallback", text, text2, "Started without a pre-roll → stopping it, then playing " + clipNames + " first [" + text3 + "]");
+				_ = StopThenPlayAsync(session.Id, request, text2, text);
+			}
+			else
+			{
+				PrerollActivityLog.Add("Server fallback", text, text2, "Started without a pre-roll → told the app to play " + clipNames + " first [" + text3 + "]");
+				_ = SendAsync(session.Id, request, text2, text);
+			}
+		}
+	}
+
+	/// <summary>How long the TV app gets to report that it stopped.</summary>
+	internal static TimeSpan StopWait { get; set; } = TimeSpan.FromSeconds(6.0);
+
+	/// <summary>Pause after the stop so the app is back on its details screen before the queue arrives.</summary>
+	internal static TimeSpan SettleDelay { get; set; } = TimeSpan.FromSeconds(1.5);
+
+	private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(250.0);
+
+	private bool IsPlaying(string sessionId, out bool sessionGone)
+	{
+		SessionInfo? s = _sessionManager.Sessions.FirstOrDefault((SessionInfo x) => x.Id == sessionId);
+		sessionGone = s == null;
+		return s?.NowPlayingItem != null;
+	}
+
+	private async Task StopThenPlayAsync(string sessionId, PlayRequest request, string itemName, string device)
+	{
+		try
+		{
+			await _sessionManager.SendPlaystateCommand((string)null, sessionId, new PlaystateRequest
+			{
+				Command = PlaystateCommand.Stop
+			}, CancellationToken.None).ConfigureAwait(continueOnCapturedContext: false);
+
+			var waited = System.Diagnostics.Stopwatch.StartNew();
+			bool playing = true;
+			bool gone = false;
+			while (waited.Elapsed < StopWait)
+			{
+				await Task.Delay(PollInterval).ConfigureAwait(continueOnCapturedContext: false);
+				playing = IsPlaying(sessionId, out gone);
+				if (!playing || gone)
+				{
+					break;
+				}
+			}
+
+			if (gone || playing)
+			{
+				ClearPending(sessionId);
+				string why = gone ? "the app disconnected" : "the app didn't stop the episode";
+				_logger.LogWarning("Pre-Roll Videos: {Why} on {Device}, so no pre-roll was sent for \"{Item}\"", why, device, itemName);
+				PrerollActivityLog.Add("Server fallback", device, itemName, "✗ No pre-roll this time: " + why + ", so the server left it alone", "warn");
+				return;
+			}
+
+			await Task.Delay(SettleDelay).ConfigureAwait(continueOnCapturedContext: false);
+
+			// Someone pressed Play again in the meantime: never interrupt it.
+			if (IsPlaying(sessionId, out gone) || gone)
+			{
+				ClearPending(sessionId);
+				PrerollActivityLog.Add("Server fallback", device, itemName, "Something else started playing before the pre-roll was sent, so the server left it alone", "info");
+				return;
+			}
+
+			await _sessionManager.SendPlayCommand((string)null, sessionId, request, CancellationToken.None).ConfigureAwait(continueOnCapturedContext: false);
+		}
+		catch (Exception ex)
+		{
+			ClearPending(sessionId);
+			_logger.LogWarning(ex, "Pre-Roll Videos: could not send pre-roll queue for \"{Item}\"", itemName);
+			PrerollActivityLog.Add("Server fallback", device, itemName, "✗ The app rejected the command: " + ex.Message, "warn");
+		}
+	}
+
+	private void ClearPending(string sessionId)
+	{
+		if (_state.TryGetValue(sessionId, out SessionState? value))
+		{
+			value.PendingItemId = Guid.Empty;
 		}
 	}
 
@@ -298,13 +426,13 @@ public sealed class PrerollSessionWatcher : IHostedService, IDisposable
 		}
 	}
 
-	private IEnumerable<Guid> GetFollowingEpisodes(Episode current)
+	private List<BaseItem> GetFollowingEpisodeItems(Episode current)
 	{
 		try
 		{
 			if (current.SeriesId == Guid.Empty)
 			{
-				return Array.Empty<Guid>();
+				return new List<BaseItem>();
 			}
 			InternalItemsQuery val = new InternalItemsQuery();
 			val.AncestorIds = new Guid[1] { current.SeriesId };
@@ -318,24 +446,12 @@ public sealed class PrerollSessionWatcher : IHostedService, IDisposable
 				orderby i.ParentIndexNumber ?? int.MaxValue, i.IndexNumber ?? int.MaxValue
 				select i).ThenBy((BaseItem i) => i.SortName ?? i.Name, StringComparer.OrdinalIgnoreCase).ToList();
 			int num = list.FindIndex((BaseItem i) => i.Id == ((BaseItem)current).Id);
-			IEnumerable<Guid> result;
-			if (num >= 0)
-			{
-				IEnumerable<Guid> enumerable = (from i in list.Skip(num + 1).Take(50)
-					select i.Id).ToList();
-				result = enumerable;
-			}
-			else
-			{
-				IEnumerable<Guid> enumerable = Array.Empty<Guid>();
-				result = enumerable;
-			}
-			return result;
+			return num >= 0 ? list.Skip(num + 1).Take(MaxQueuedEpisodes).ToList() : new List<BaseItem>();
 		}
 		catch (Exception exception)
 		{
 			_logger.LogDebug(exception, "Pre-Roll Videos: could not list following episodes");
-			return Array.Empty<Guid>();
+			return new List<BaseItem>();
 		}
 	}
 }

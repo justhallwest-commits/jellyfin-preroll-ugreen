@@ -193,6 +193,21 @@
                             </div>
                         </div>
                         <div class="checkboxContainer">
+                            <label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" id="chkNativeQueue" checked /><span>Jellyfin app on Fire TV / Android TV (recommended)</span></label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                That app doesn't use the web player and only asks for pre-rolls before movies. With this on, the plugin adds
+                                pre-rolls to the episode list the app plays from (Play on an episode, a season or a show, and Shuffle),
+                                so every episode gets one, autoplay included, with no flash.
+                                In the app, keep <b>Settings → Playback → Prerolls</b> on so movies get theirs too, and
+                                <b>Playback → Next up → Queue all episodes</b> on.
+                            </div>
+                            <div class="prRow" style="margin:.5em 0 0 1.85em;">
+                                <span class="prMuted">Apps whose name contains</span>
+                                <input class="prIn" id="inputNativeClients" placeholder="Android TV" style="width:14em;" />
+                                <span class="prMuted">(comma-separated)</span>
+                            </div>
+                        </div>
+                        <div class="checkboxContainer">
                             <label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" id="chkAutoplay" checked /><span>Server fallback for other apps</span></label>
                             <div class="fieldDescription checkboxFieldDescription">
                                 For apps without the web player (e.g. native TV apps): if something starts without a pre-roll, the server tells
@@ -553,6 +568,8 @@
                     $('#chkEnableMovies').checked = config.EnableForMovies !== false;
                     $('#chkAutoplay').checked = config.PlayBeforeAutoplay !== false;
                     $('#chkWebPlayer').checked = config.EnableWebPlayerIntegration !== false;
+                    $('#chkNativeQueue').checked = config.EnableNativeAppQueue !== false;
+                    $('#inputNativeClients').value = config.NativeAppClients == null ? 'Android TV' : config.NativeAppClients;
                     $('#chkSimilar').checked = !!config.SimilarFallback;
                     $('#chkSameVersions').checked = config.SameForAllVersions !== false;
                     $('#chkSkippable').checked = !!config.SkippablePrerolls;
@@ -846,6 +863,8 @@
                     config.EnableForMovies = $('#chkEnableMovies').checked;
                     config.PlayBeforeAutoplay = $('#chkAutoplay').checked;
                     config.EnableWebPlayerIntegration = $('#chkWebPlayer').checked;
+                    config.EnableNativeAppQueue = $('#chkNativeQueue').checked;
+                    config.NativeAppClients = $('#inputNativeClients').value.trim() || 'Android TV';
                     config.SimilarFallback = $('#chkSimilar').checked;
                     config.SameForAllVersions = $('#chkSameVersions').checked;
                     config.SkippablePrerolls = $('#chkSkippable').checked;
@@ -1013,6 +1032,15 @@
                         } else {
                             add('warn', "Web player integration hasn't checked in since the server started. Reload Jellyfin in your browser (Ctrl+F5) or reopen the apps.");
                         }
+                    }
+                    if (h.NativeQueue) {
+                        if ((h.NativeDevices || []).length) {
+                            add('ok', 'Fire TV / Android TV app: pre-rolls added to its episode queue on ' + h.NativeDevices.slice(0, 5).map(function (d) { return esc(d.Key) + ' <span class="prMuted">(' + ago(d.Value) + ')</span>'; }).join(', ') + '.');
+                        } else {
+                            add('ok', 'Fire TV / Android TV app support is on. It shows up here after an episode is played in that app.');
+                        }
+                    } else {
+                        add('warn', 'Fire TV / Android TV app support is off, so episodes played in that app only get a pre-roll through the server fallback (with a flash), if at all. Turn it on on the General tab.');
                     }
                     if (!h.WebIntegration && !h.ServerFallback) {
                         add('bad', 'Both delivery options are off, so only S01E01-style starts get pre-rolls. Turn on web player integration on the General tab.');

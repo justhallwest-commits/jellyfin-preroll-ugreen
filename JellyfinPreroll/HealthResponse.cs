@@ -35,6 +35,10 @@ public class HealthResponse
 
 	public bool ServerFallback { get; set; }
 
+	public bool NativeQueue { get; set; }
+
+	public List<KeyValuePair<string, string>> NativeDevices { get; set; } = new List<KeyValuePair<string, string>>();
+
 	public List<KeyValuePair<string, string>> ScriptDevices { get; set; } = new List<KeyValuePair<string, string>>();
 
 	public int RecentWarnings { get; set; }
