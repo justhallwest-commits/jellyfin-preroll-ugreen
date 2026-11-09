@@ -9,6 +9,30 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "3.2.1.12",
+        "changelog": "v3.2.1 for Jellyfin 12: similar-title fallback, same pre-roll for every version, skippable pre-rolls, playlist line-up",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/justhallwest-commits/jellyfin-preroll-ugreen/releases/download/v3.2.1/jellyfin-preroll-v3.2.1-jf12.zip",
+        "checksum": "fde917273ee8a2962c063a6fe784a496",
+        "timestamp": "2026-11-09T02:15:43Z"
+      },
+      {
+        "version": "3.2.1.0",
+        "changelog": "v3.2.1 for Jellyfin 10.11",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/justhallwest-commits/jellyfin-preroll-ugreen/releases/download/v3.2.1/jellyfin-preroll-v3.2.1.zip",
+        "checksum": "2b077e34163e0c5c44a0b2f670277d5d",
+        "timestamp": "2026-11-09T02:15:43Z"
+      },
+      {
+        "version": "1.32.1.0",
+        "changelog": "v3.2.1 for Jellyfin 10.10",
+        "targetAbi": "10.10.0.0",
+        "sourceUrl": "https://github.com/justhallwest-commits/jellyfin-preroll-ugreen/releases/download/v3.2.1/jellyfin-preroll-v3.2.1-jf10.10.zip",
+        "checksum": "fce2f72c1ba6dba09effb20afae82ffe",
+        "timestamp": "2026-11-09T02:15:43Z"
+      },
+      {
         "version": "3.1.0.12",
         "changelog": "v3.1.0 for Jellyfin 12: similar-title fallback, same pre-roll for every version, skippable pre-rolls, playlist line-up",
         "targetAbi": "12.0.0.0",
